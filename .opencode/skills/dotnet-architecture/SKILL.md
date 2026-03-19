@@ -1,16 +1,50 @@
 ---
 name: dotnet-architecture
-description: Project structure rules and Clean Architecture principles for the DataNormalizer repository. Covers solution layout, MSBuild configuration, project references, and the relationship between the runtime library, source generator, tests, and samples.
+description: Project structure rules, MSBuild linting, and Clean Architecture principles for the DataNormalizer repository. Covers solution layout, project references, Directory.Build.props/Directory.Packages.props linting rules, and the relationship between runtime library, source generator, tests, and samples.
 ---
 
 # Project Architecture
+
+## MSBuild Linting Rules
+
+These rules ensure consistent MSBuild configuration across the solution.
+
+### RULE_A: No Hardcoded Versions in Directory.Packages.props
+
+Package versions in `Directory.Packages.props` should use meaningful version values. If the project defines version variables (e.g., in `Version.props`), use them consistently rather than hardcoding the same version in multiple places.
+
+```xml
+<!-- WRONG - same version repeated -->
+<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
+<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="4.12.0" />
+
+<!-- CORRECT - use a variable if versions are shared -->
+<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynVersion)" />
+<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(RoslynVersion)" />
+```
+
+### RULE_B: Version.props Import Locations
+
+If the project uses a `Version.props` file, it should only be imported in `Directory.Build.props` or `Directory.Packages.props` — never in individual `.csproj` files.
+
+### RULE_G: No Package Versions in .csproj
+
+`<PackageReference>` elements in `.csproj` files must NEVER include a `Version` attribute when CPM is enabled. All versions belong in `Directory.Packages.props`.
+
+```xml
+<!-- WRONG -->
+<PackageReference Include="NUnit" Version="4.3.2" />
+
+<!-- CORRECT -->
+<PackageReference Include="NUnit" />
+```
 
 ## Repository Structure
 
 ```
 DataNormalizer/
 ├── src/
-│   ├── DataNormalizer/                    # Runtime library (net8.0;net9.0;net10.0)
+│   ├── DataNormalizer/                    # Runtime library (net8.0;net9.0)
 │   │   ├── Attributes/                   # Marker attributes for source generator
 │   │   ├── Configuration/                # Fluent builder API (no-op at runtime)
 │   │   ├── Runtime/                      # NormalizationContext, NormalizedResult

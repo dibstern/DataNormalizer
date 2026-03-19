@@ -1,11 +1,11 @@
 ---
 name: dotnet-patterns
-description: C# development patterns for the DataNormalizer project. Covers records with init-only properties, pattern matching, nullable reference types, async/await best practices, LINQ (method syntax), dependency injection, generic constraints, and the Result<T> pattern for error handling.
+description: C# development patterns for the DataNormalizer project. Covers records with init-only properties, pattern matching (type/property/list/positional), nullable reference types, async/await with ConfigureAwait(false), LINQ method syntax, dependency injection, generic constraints with IEquatable<T>, and Result<T> error handling.
 ---
 
 # C# Development Patterns
 
-## Records with Init-Only Properties
+## Records and Init-Only Properties
 
 Use records for immutable data transfer objects and value objects. Prefer `init` over `set` for properties that should only be set during initialization.
 
@@ -27,9 +27,9 @@ public sealed record TypeGraphNode
 public readonly record struct IndexEntry(int Index, bool IsNew);
 ```
 
-## Pattern Matching
+**DataNormalizer note:** Generator pipeline models MUST be records. The incremental generator caches pipeline results and uses structural equality to avoid re-emitting unchanged output. Non-equatable models break caching and cause unnecessary recompilation.
 
-Use type patterns, property patterns, and switch expressions for cleaner control flow.
+## Pattern Matching
 
 ### Type Patterns
 
@@ -83,6 +83,18 @@ if (invocation.ArgumentList.Arguments is [var singleArg])
 }
 ```
 
+### Positional Patterns
+
+```csharp
+// Deconstruct in pattern
+public static string Describe(IndexEntry entry) => entry switch
+{
+    (0, true) => "First item added",
+    (_, true) => $"New item at index {entry.Index}",
+    (_, false) => $"Existing item at index {entry.Index}",
+};
+```
+
 ## Nullable Reference Types
 
 ### Method Signatures
@@ -105,7 +117,7 @@ public void Process(INamedTypeSymbol type)
 var name = type.ContainingNamespace?.ToDisplayString();
 
 // Null-coalescing assignment
-_cache ??= BuildCache();
+cache ??= BuildCache();
 
 // Null-coalescing with throw
 var symbol = semanticModel.GetDeclaredSymbol(node)
@@ -128,15 +140,22 @@ public void Process(string? input)
 
 ## Async/Await Best Practices
 
-### ConfigureAwait in Libraries
+### ConfigureAwait in Libraries (MANDATORY)
 
-DataNormalizer is a library — always use `ConfigureAwait(false)` in async methods.
+DataNormalizer is a library — **always** use `ConfigureAwait(false)` in async methods. This prevents deadlocks when consumers call from synchronization contexts (WPF, WinForms, ASP.NET classic).
 
 ```csharp
 // CORRECT - library code
 public async Task<NormalizedResult<T>> NormalizeAsync<T>(T source, CancellationToken cancellationToken = default)
 {
     var data = await LoadDataAsync(cancellationToken).ConfigureAwait(false);
+    return Process(data);
+}
+
+// WRONG - missing ConfigureAwait in library
+public async Task<NormalizedResult<T>> NormalizeAsync<T>(T source)
+{
+    var data = await LoadDataAsync(); // potential deadlock
     return Process(data);
 }
 ```
@@ -146,12 +165,24 @@ public async Task<NormalizedResult<T>> NormalizeAsync<T>(T source, CancellationT
 Always accept and forward `CancellationToken` in async methods.
 
 ```csharp
-// CORRECT
 public async Task<Result<T>> ProcessAsync(T input, CancellationToken cancellationToken = default)
 {
     cancellationToken.ThrowIfCancellationRequested();
     var result = await ComputeAsync(input, cancellationToken).ConfigureAwait(false);
     return Result.Ok(result);
+}
+```
+
+### Parallel Async
+
+```csharp
+// Run independent operations concurrently
+public async Task<(Result<A> a, Result<B> b)> ProcessBothAsync(CancellationToken ct = default)
+{
+    var taskA = ProcessAAsync(ct);
+    var taskB = ProcessBAsync(ct);
+    await Task.WhenAll(taskA, taskB).ConfigureAwait(false);
+    return (await taskA, await taskB);
 }
 ```
 
@@ -176,10 +207,32 @@ Use `ValueTask<T>` when the result is frequently available synchronously.
 ```csharp
 public ValueTask<int> GetCachedCountAsync()
 {
-    if (_cache.TryGetValue("count", out var count))
+    if (cache.TryGetValue("count", out var count))
         return ValueTask.FromResult(count);
 
     return ComputeCountAsync();
+}
+```
+
+### IAsyncEnumerable
+
+```csharp
+public async IAsyncEnumerable<TypeGraphNode> AnalyzeTypesAsync(
+    IEnumerable<INamedTypeSymbol> types,
+    [EnumeratorCancellation] CancellationToken cancellationToken = default)
+{
+    foreach (var type in types)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var node = await AnalyzeTypeAsync(type, cancellationToken).ConfigureAwait(false);
+        yield return node;
+    }
+}
+
+// Consuming
+await foreach (var node in AnalyzeTypesAsync(types, ct).ConfigureAwait(false))
+{
+    ProcessNode(node);
 }
 ```
 
@@ -190,33 +243,51 @@ Prefer method syntax over query syntax for consistency.
 ```csharp
 // CORRECT - method syntax
 var normalizedTypes = typeGraph
-    .Where(static node => node.Kind == PropertyKind.Normalized)
-    .Select(static node => node.TypeName)
+    .Where(static x => x.Kind == PropertyKind.Normalized)
+    .Select(static x => x.TypeName)
     .Distinct()
-    .OrderBy(static name => name)
+    .OrderBy(static x => x)
     .ToList();
 
 // AVOID - query syntax
 var normalizedTypes = (from node in typeGraph
                        where node.Kind == PropertyKind.Normalized
-                       select node.TypeName).Distinct().OrderBy(n => n).ToList();
+                       select node.TypeName).Distinct().OrderBy(x => x).ToList();
 ```
 
 ### Common LINQ Patterns
 
 ```csharp
 // Existence checks
-bool hasCircular = nodes.Any(static n => n.HasCircularReference);
+bool hasCircular = nodes.Any(static x => x.HasCircularReference);
 
 // First with default
-var rootNode = nodes.FirstOrDefault(n => n.TypeName == rootTypeName);
+var rootNode = nodes.FirstOrDefault(x => x.TypeName == rootTypeName);
 
 // Grouping
-var byKind = properties.GroupBy(static p => p.Kind)
-    .ToDictionary(static g => g.Key, static g => g.ToList());
+var byKind = properties
+    .GroupBy(static x => x.Kind)
+    .ToDictionary(static x => x.Key, static x => x.ToList());
 
 // OfType for filtering and casting
 var namedTypes = members.OfType<INamedTypeSymbol>();
+
+// SelectMany for flattening
+var allProperties = nodes
+    .SelectMany(static x => x.Properties)
+    .Distinct()
+    .ToList();
+
+// Aggregate
+var totalCount = groups.Aggregate(0, (sum, x) => sum + x.Count);
+
+// Complex pipeline
+var report = typeGraph
+    .Where(static x => x.Properties.Any())
+    .GroupBy(static x => x.Kind)
+    .Select(static x => new { Kind = x.Key, Types = x.OrderBy(static t => t.TypeName).ToList() })
+    .OrderBy(static x => x.Kind)
+    .ToList();
 ```
 
 ## Dependency Injection
@@ -252,21 +323,49 @@ public interface IDenormalizationEngine
 }
 ```
 
-## Generic Constraints
-
-Use constraints to express intent and get compile-time safety.
+### Registration Patterns
 
 ```csharp
-// Equatable constraint for dedup
+// Singleton - shared state, thread-safe, created once
+services.AddSingleton<INormalizationEngine, NormalizationEngine>();
+
+// Scoped - per-request/operation, new instance per scope
+services.AddScoped<INormalizationContext, NormalizationContext>();
+
+// Transient - new instance every time, stateless services
+services.AddTransient<ITypeAnalyzer, TypeAnalyzer>();
+
+// Extension method for clean registration
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddDataNormalizer(
+        this IServiceCollection services,
+        Action<NormalizerOptions>? configure = null)
+    {
+        if (configure is not null)
+            services.Configure(configure);
+
+        services.AddSingleton<INormalizationEngine, NormalizationEngine>();
+        return services;
+    }
+}
+```
+
+## Generic Patterns
+
+### Constraints for Compile-Time Safety
+
+```csharp
+// IEquatable<TDto> constraint for dedup — central to DataNormalizer
 public (int Index, bool IsNew) GetOrAddIndex<TDto>(string typeKey, TDto dto)
     where TDto : IEquatable<TDto>
 {
-    // Compiler enforces TDto has Equals
+    // Compiler enforces TDto has Equals for deduplication
 }
 
 // Class constraint for reference type collections
 public IReadOnlyList<T> GetCollection<T>(string typeKey) where T : class
-    => _collections.TryGetValue(typeKey, out var list)
+    => collections.TryGetValue(typeKey, out var list)
         ? list.Cast<T>().ToList()
         : Array.Empty<T>();
 
@@ -274,6 +373,23 @@ public IReadOnlyList<T> GetCollection<T>(string typeKey) where T : class
 public T Resolve<T>(NormalizedResult<T> result) where T : class, IEquatable<T>, new()
 {
     // ...
+}
+```
+
+### Covariance and Contravariance
+
+```csharp
+// Covariant (out) - can return derived types
+public interface IReadOnlyRepository<out T> where T : class
+{
+    T? GetById(Guid id);
+    IReadOnlyList<T> GetAll();
+}
+
+// Contravariant (in) - can accept base types
+public interface IComparer<in T>
+{
+    int Compare(T x, T y);
 }
 ```
 

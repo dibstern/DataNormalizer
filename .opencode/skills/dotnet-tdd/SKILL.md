@@ -1,45 +1,74 @@
 ---
 name: dotnet-tdd
-description: Test-Driven Development workflow for the DataNormalizer project using NUnit 4. Covers Red-Green-Refactor cycle, NUnit 4 specifics (Test/TestCase/Assert.That), AAA pattern, test naming conventions, test doubles, and commands for running tests.
+description: Test-Driven Development workflow for the DataNormalizer project using NUnit 4. Covers Red-Green-Refactor cycle, NUnit 4 specifics (Test/TestCase/Assert.That constraint syntax), AAA pattern, test naming, test doubles, Verify.SourceGenerators snapshot testing, and commands for running tests.
 ---
 
 # Test-Driven Development with NUnit 4
 
 ## Red-Green-Refactor Cycle
 
-1. **RED**: Write a failing test that describes the desired behavior
-2. **GREEN**: Write the minimal code to make the test pass
-3. **REFACTOR**: Improve the code while keeping tests green
+```
+ ┌─────────────────────────────────────────────┐
+ │                                             │
+ │   ┌───────┐   ┌─────────┐   ┌──────────┐   │
+ │   │  RED  │──▶│  GREEN  │──▶│ REFACTOR │───┘
+ │   └───────┘   └─────────┘   └──────────┘
+ │
+ │   Write a      Write the     Improve code
+ │   failing      minimal       while keeping
+ │   test         code to       tests green
+ │                pass
+```
 
-### Example Cycle
+### Phase 1: RED — Write a Failing Test
+
+Rules:
+- Write the test BEFORE any implementation code
+- The test MUST fail (red) when first run — if it passes, something is wrong
+- Test name follows `MethodName_Scenario_ExpectedResult` convention
+- Use AAA pattern (Arrange-Act-Assert)
+- Categorize with `[Category("Unit")]` or `[Category("Integration")]`
 
 ```csharp
 // 1. RED - Write the test first (NormalizationContext doesn't exist yet)
 [Test]
+[Category("Unit")]
 public void GetOrAddIndex_FirstObject_ReturnsZeroAndIsNew()
 {
+    // Arrange
     var ctx = new NormalizationContext();
     var dto = new TestDto("Alice", 30);
 
+    // Act
     var (index, isNew) = ctx.GetOrAddIndex("person", dto);
 
+    // Assert
     Assert.That(index, Is.EqualTo(0));
     Assert.That(isNew, Is.True);
 }
+```
 
+### Phase 2: GREEN — Make It Pass
+
+Rules:
+- Write the MINIMUM code to make the test pass — no more
+- "Fake it till you make it": hardcoded values are fine initially
+- Don't optimize, don't refactor, don't add features
+- Only fix the currently failing test
+
+```csharp
 // 2. GREEN - Implement the minimal code
 public sealed class NormalizationContext
 {
-    private readonly Dictionary<string, object> _maps = new();
+    private readonly Dictionary<string, object> maps = new();
 
     public (int Index, bool IsNew) GetOrAddIndex<TDto>(string typeKey, TDto dto)
         where TDto : IEquatable<TDto>
     {
-        // minimal implementation
-        if (!_maps.TryGetValue(typeKey, out var mapObj))
+        if (!maps.TryGetValue(typeKey, out var mapObj))
         {
             mapObj = new Dictionary<TDto, int>();
-            _maps[typeKey] = mapObj;
+            maps[typeKey] = mapObj;
         }
         var map = (Dictionary<TDto, int>)mapObj;
         if (map.TryGetValue(dto, out var idx))
@@ -49,13 +78,21 @@ public sealed class NormalizationContext
         return (newIdx, true);
     }
 }
-
-// 3. REFACTOR - Clean up while tests stay green
 ```
 
-## NUnit 4 Specifics
+### Phase 3: REFACTOR — Improve the Code
 
-### CRITICAL: NUnit 4, NOT xUnit
+Rules:
+- Run tests after EVERY change — they must stay green
+- Refactoring checklist:
+  - [ ] Extract methods for repeated logic
+  - [ ] Rename for clarity
+  - [ ] Remove duplication (DRY)
+  - [ ] Simplify conditionals
+  - [ ] Apply project coding standards (`sealed`, `record`, file-scoped namespaces)
+- Common refactorings: Extract Method, Extract Class, Rename, Inline Variable, Replace Conditional with Pattern Matching
+
+## CRITICAL: NUnit 4, NOT xUnit
 
 This project uses **NUnit 4**. Never use xUnit conventions.
 
@@ -68,26 +105,37 @@ This project uses **NUnit 4**. Never use xUnit conventions.
 | `[TearDown]` | `IDisposable` |
 | `[OneTimeSetUp]` | `IClassFixture<T>` |
 | `[OneTimeTearDown]` | `IClassFixture<T>.Dispose` |
+| `[Category("Unit")]` | `[Trait("Category", "Unit")]` |
+| `[Ignore("Reason")]` | `[Skip("Reason")]` |
 | `Assert.That(x, Is.EqualTo(y))` | `Assert.Equal(y, x)` |
+| `Assert.That(x, Is.True)` | `Assert.True(x)` |
+| `Assert.That(x, Is.Not.Null)` | `Assert.NotNull(x)` |
 
-### Test Attributes
+### Test Class Structure
 
 ```csharp
 [TestFixture]
 public sealed class NormalizationContextTests
 {
-    private NormalizationContext _context = null!;
+    private NormalizationContext context = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _context = new NormalizationContext();
+        // Fresh instance for each test (replaces xUnit constructor)
+        context = new NormalizationContext();
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        // Cleanup if needed (replaces xUnit IDisposable)
     }
 
     [Test]
     public void GetOrAddIndex_FirstObject_ReturnsZero()
     {
-        var (index, _) = _context.GetOrAddIndex("person", new TestDto("Alice", 30));
+        var (index, _) = context.GetOrAddIndex("person", new TestDto("Alice", 30));
         Assert.That(index, Is.EqualTo(0));
     }
 
@@ -95,40 +143,73 @@ public sealed class NormalizationContextTests
     [TestCase("Bob", 25, 1)]
     public void GetOrAddIndex_MultipleObjects_ReturnsSequentialIndices(string name, int age, int expected)
     {
-        // Add Alice first to establish index 0
-        _context.GetOrAddIndex("person", new TestDto("Alice", 30));
+        context.GetOrAddIndex("person", new TestDto("Alice", 30));
         if (name != "Alice")
         {
-            var (index, _) = _context.GetOrAddIndex("person", new TestDto(name, age));
+            var (index, _) = context.GetOrAddIndex("person", new TestDto(name, age));
             Assert.That(index, Is.EqualTo(expected));
         }
     }
 }
 ```
 
-### Assert.That Constraint Syntax
+### One-Time Setup (Replaces IClassFixture)
+
+```csharp
+[TestFixture]
+public sealed class ExpensiveResourceTests
+{
+    private static ExpensiveResource resource = null!;
+
+    [OneTimeSetUp]
+    public void OneTimeSetUp()
+    {
+        // Runs once before all tests in this fixture
+        resource = new ExpensiveResource();
+    }
+
+    [OneTimeTearDown]
+    public void OneTimeTearDown()
+    {
+        // Runs once after all tests in this fixture
+        resource.Dispose();
+    }
+
+    [Test]
+    public void Test1() { /* uses resource */ }
+
+    [Test]
+    public void Test2() { /* uses resource */ }
+}
+```
+
+## Assert.That Constraint Syntax (Complete Reference)
 
 Always use the constraint-based `Assert.That()` syntax:
 
 ```csharp
-// Equality
+// === Equality ===
 Assert.That(result, Is.EqualTo(expected));
 Assert.That(result, Is.Not.EqualTo(unexpected));
 
-// Null checks
+// === Null ===
 Assert.That(result, Is.Null);
 Assert.That(result, Is.Not.Null);
 
-// Boolean
+// === Boolean ===
 Assert.That(isNew, Is.True);
 Assert.That(exists, Is.False);
 
-// String
+// === String ===
 Assert.That(message, Does.Contain("error"));
 Assert.That(name, Does.StartWith("Normalized"));
+Assert.That(name, Does.EndWith("Dto"));
+Assert.That(name, Does.Match("^Normal.*Dto$"));
 Assert.That(name, Is.EqualTo("person").IgnoreCase);
+Assert.That(source, Is.Empty);
+Assert.That(source, Is.Not.Empty);
 
-// Collections
+// === Collections ===
 Assert.That(collection, Has.Count.EqualTo(3));
 Assert.That(collection, Is.Empty);
 Assert.That(collection, Is.Not.Empty);
@@ -136,16 +217,28 @@ Assert.That(collection, Has.Exactly(2).Items);
 Assert.That(collection, Does.Contain(item));
 Assert.That(collection, Is.All.Not.Null);
 Assert.That(collection, Is.Ordered);
+Assert.That(collection, Is.Ordered.Descending);
+Assert.That(collection, Is.Unique);
+Assert.That(collection, Has.Member(item));
+Assert.That(collection, Has.No.Member(item));
+Assert.That(collection, Is.EquivalentTo(expected));   // same items, any order
+Assert.That(collection, Is.SubsetOf(superset));
 
-// Numeric
+// === Numeric ===
 Assert.That(value, Is.GreaterThan(0));
+Assert.That(value, Is.LessThan(100));
+Assert.That(value, Is.GreaterThanOrEqualTo(1));
 Assert.That(value, Is.InRange(1, 10));
+Assert.That(value, Is.Positive);
+Assert.That(value, Is.Negative);
+Assert.That(value, Is.Zero);
+Assert.That(actual, Is.EqualTo(3.14).Within(0.01));   // floating point
 
-// Type
+// === Type ===
 Assert.That(result, Is.InstanceOf<NormalizedResult<TestDto>>());
 Assert.That(result, Is.AssignableTo<IEquatable<TestDto>>());
 
-// Exceptions
+// === Exceptions ===
 Assert.That(() => context.AddToCollection("key", -1, obj),
     Throws.InstanceOf<ArgumentOutOfRangeException>());
 
@@ -153,13 +246,19 @@ Assert.That(() => new NormalizationContext().Resolve<TestDto>("missing", 0),
     Throws.InstanceOf<ArgumentOutOfRangeException>()
         .With.Message.Contains("out of range"));
 
-// Async exceptions
+Assert.That(() => DoSomething(), Throws.Nothing);  // no exception
+
+// === Async Exceptions ===
 Assert.That(async () => await service.ProcessAsync(null!),
     Throws.InstanceOf<ArgumentNullException>());
 
-// Reference equality
+// === Reference Equality ===
 Assert.That(actual, Is.SameAs(expected));
 Assert.That(actual, Is.Not.SameAs(other));
+
+// === Compound ===
+Assert.That(value, Is.GreaterThan(0).And.LessThan(100));
+Assert.That(name, Is.Not.Null.And.Not.Empty);
 ```
 
 ## AAA Pattern (Arrange-Act-Assert)
@@ -193,36 +292,25 @@ public void Normalize_SharedAddress_DeduplicatesToOneEntry()
 Pattern: `MethodName_Scenario_ExpectedResult`
 
 ```csharp
-[Test]
-public void GetOrAddIndex_FirstObject_ReturnsZeroAndIsNew() { }
-
-[Test]
-public void GetOrAddIndex_EqualObject_ReturnsSameIndex() { }
-
-[Test]
-public void GetOrAddIndex_DifferentTypeKeys_TracksSeparately() { }
-
-[Test]
-public void AddToCollection_NegativeIndex_ThrowsArgumentOutOfRange() { }
-
-[Test]
-public void Normalize_WithCircularReference_DoesNotInfiniteLoop() { }
-
-[Test]
-public void Roundtrip_NormalizeThenDenormalize_ProducesEquivalentObject() { }
+[Test] public void GetOrAddIndex_FirstObject_ReturnsZeroAndIsNew() { }
+[Test] public void GetOrAddIndex_EqualObject_ReturnsSameIndex() { }
+[Test] public void GetOrAddIndex_DifferentTypeKeys_TracksSeparately() { }
+[Test] public void AddToCollection_NegativeIndex_ThrowsArgumentOutOfRange() { }
+[Test] public void Normalize_WithCircularReference_DoesNotInfiniteLoop() { }
+[Test] public void Roundtrip_NormalizeThenDenormalize_ProducesEquivalentObject() { }
 ```
 
 ## Test Doubles
 
 ### Types of Test Doubles
 
-| Double | Purpose | Example |
-|--------|---------|---------|
+| Double | Purpose | When to Use |
+|--------|---------|-------------|
 | **Dummy** | Fills a parameter, never used | `NullLogger<T>.Instance` |
 | **Stub** | Returns predetermined values | `FakeClock(fixedTime)` |
-| **Spy** | Records calls for later verification | `SpyLogger` with `Entries` list |
+| **Spy** | Records calls for verification | `SpyLogger` with `Entries` list |
 | **Mock** | Verifies interactions | Moq or NSubstitute mock |
-| **Fake** | Working implementation (simplified) | In-memory repository |
+| **Fake** | Working simplified implementation | In-memory repository |
 
 ### Prefer Fakes Over Mocks
 
@@ -239,7 +327,7 @@ public sealed class FakeNormalizationEngine : INormalizationEngine
     }
 }
 
-// USE WHEN NEEDED - Mock (for interaction verification)
+// USE WHEN NEEDED - Spy (for interaction verification)
 [Test]
 public void Service_LogsOnNormalization()
 {
@@ -293,36 +381,23 @@ public void Context_WorksCorrectly()
 Tests must not depend on execution order. Each test sets up its own state.
 
 ```csharp
-// CORRECT - independent
+// CORRECT - shared setup via [SetUp]
 [TestFixture]
 public sealed class ContextTests
 {
-    [Test]
-    public void Test1()
-    {
-        var ctx = new NormalizationContext(); // fresh instance
-        // ...
-    }
-
-    [Test]
-    public void Test2()
-    {
-        var ctx = new NormalizationContext(); // fresh instance
-        // ...
-    }
-}
-
-// ALSO CORRECT - shared setup via [SetUp]
-[TestFixture]
-public sealed class ContextTests
-{
-    private NormalizationContext _ctx = null!;
+    private NormalizationContext ctx = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _ctx = new NormalizationContext(); // fresh for each test
+        ctx = new NormalizationContext(); // fresh for each test
     }
+
+    [Test]
+    public void Test1() { /* uses ctx */ }
+
+    [Test]
+    public void Test2() { /* uses ctx */ }
 }
 ```
 
@@ -357,7 +432,55 @@ public sealed class DtoEmitterTests
 }
 ```
 
-Snapshot files go in a `Snapshots/` directory adjacent to the test. The `.verified.cs` files are committed to source control.
+Snapshot files go in a `Snapshots/` directory adjacent to the test. The `.verified.cs` files are committed to source control. The `.received.cs` files are generated on test failure for diffing and should be in `.gitignore`.
+
+### Updating Snapshots
+
+When generator output intentionally changes:
+1. Run the tests (they will fail)
+2. Review the `.received.cs` diff
+3. Accept the new snapshot: copy `.received.cs` → `.verified.cs` (or use Verify's auto-accept)
+4. Re-run tests to confirm they pass
+
+## Anti-Patterns
+
+### Testing Implementation Details
+
+```csharp
+// WRONG - testing private internals
+[Test]
+public void GetOrAddIndex_CreatesDictionaryInternally()
+{
+    var ctx = new NormalizationContext();
+    // Reflection to check internal dictionary — brittle!
+    var field = typeof(NormalizationContext).GetField("maps", BindingFlags.NonPublic | BindingFlags.Instance);
+    Assert.That(field!.GetValue(ctx), Is.Not.Null);
+}
+
+// CORRECT - test behavior through public API
+[Test]
+public void GetOrAddIndex_SameObjectTwice_ReturnsSameIndex()
+{
+    var ctx = new NormalizationContext();
+    var dto = new TestDto("Alice", 30);
+
+    var first = ctx.GetOrAddIndex("person", dto);
+    var second = ctx.GetOrAddIndex("person", dto);
+
+    Assert.That(first.Index, Is.EqualTo(second.Index));
+    Assert.That(second.IsNew, Is.False);
+}
+```
+
+### Order-Dependent Tests
+
+```csharp
+// WRONG - Test2 depends on Test1 running first
+private static int sharedCounter;
+
+[Test] public void Test1() { sharedCounter = 1; }
+[Test] public void Test2() { Assert.That(sharedCounter, Is.EqualTo(1)); } // fragile!
+```
 
 ## Commands
 
@@ -374,9 +497,15 @@ dotnet test --filter "FullyQualifiedName~NormalizationContextTests"
 # Filter by test method name
 dotnet test --filter "FullyQualifiedName~GetOrAddIndex_FirstObject"
 
+# Filter by category
+dotnet test --filter "Category=Unit"
+
 # Verbose output
 dotnet test --verbosity normal
 
-# With logger
+# With TRX logger
 dotnet test --logger "trx;LogFileName=results.trx"
+
+# Run and update Verify snapshots
+dotnet test -- Verify.AutoVerify=true
 ```

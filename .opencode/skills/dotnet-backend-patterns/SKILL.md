@@ -1,9 +1,21 @@
 ---
 name: dotnet-backend-patterns
-description: .NET backend patterns adapted for the DataNormalizer project. Covers DI registration (scoped/transient/singleton, keyed services), IOptions pattern, Result<T> error handling, async best practices, and NUnit 4 test examples with Assert.That syntax.
+description: .NET backend patterns adapted for the DataNormalizer NuGet library. Covers DI registration (scoped/transient/singleton, keyed services, factory pattern), IOptions pattern, Result<T> error handling, async best practices with ConfigureAwait(false), and NUnit 4 test examples with Assert.That constraint syntax.
 ---
 
 # .NET Backend Patterns
+
+## Project Structure (Clean Architecture)
+
+DataNormalizer follows clean architecture principles as a NuGet library:
+
+| Layer | Project | Purpose |
+|-------|---------|---------|
+| Public API | `DataNormalizer` | Attributes, configuration, runtime containers |
+| Code Generation | `DataNormalizer.Generators` | Roslyn source generator (netstandard2.0) |
+| Unit Tests | `DataNormalizer.Tests` | Runtime behavior tests (NUnit 4) |
+| Snapshot Tests | `DataNormalizer.Generators.Tests` | Generator output verification (Verify) |
+| Integration Tests | `DataNormalizer.Integration.Tests` | End-to-end with real generated code |
 
 ## Dependency Injection Patterns
 
@@ -28,6 +40,16 @@ services.AddTransient<ITypeAnalyzer, TypeAnalyzer>();
 | Scoped | Per-operation state, unit-of-work | `NormalizationContext` |
 | Transient | Lightweight stateless services | `TypeAnalyzer` |
 
+**Anti-pattern: Captive Dependencies** - Never inject a scoped service into a singleton. The scoped service becomes "captive" — held for the lifetime of the singleton.
+
+```csharp
+// WRONG - captive dependency
+services.AddSingleton<MySingleton>();   // lives forever
+services.AddScoped<MyScopedDep>();      // should live per-scope
+
+public sealed class MySingleton(MyScopedDep dep) { } // dep is now captive!
+```
+
 ### Keyed Services (.NET 8+)
 
 ```csharp
@@ -42,6 +64,21 @@ public sealed class ExportService([FromKeyedServices("json")] ISerializer serial
 }
 ```
 
+### Factory Pattern
+
+```csharp
+// When you need runtime decisions for service creation
+services.AddSingleton<INormalizerFactory, NormalizerFactory>();
+
+public sealed class NormalizerFactory(IServiceProvider provider) : INormalizerFactory
+{
+    public INormalizer Create(NormalizerOptions options)
+    {
+        return new Normalizer(options, provider.GetRequiredService<ILogger<Normalizer>>());
+    }
+}
+```
+
 ### Constructor Injection with Primary Constructors
 
 ```csharp
@@ -52,7 +89,7 @@ public sealed class NormalizerService(
 {
     public NormalizedResult<T> Normalize<T>(T source)
     {
-        logger.LogDebug("Normalizing type {TypeName}", typeof(T).Name);
+        logger.LogDebug("Normalizing type {TypeName}.", typeof(T).Name);
         return engine.Process(source, options.Value);
     }
 }
@@ -94,10 +131,10 @@ public sealed class NormalizerOptions
 ### Registration
 
 ```csharp
-// From configuration
+// From configuration section
 services.Configure<NormalizerOptions>(config.GetSection(NormalizerOptions.SectionName));
 
-// With validation
+// With data annotation validation
 services.AddOptions<NormalizerOptions>()
     .BindConfiguration(NormalizerOptions.SectionName)
     .ValidateDataAnnotations()
@@ -106,11 +143,17 @@ services.AddOptions<NormalizerOptions>()
 
 ### Injection Variants
 
+| Interface | Lifetime | Reloads? | Use When |
+|-----------|----------|----------|----------|
+| `IOptions<T>` | Singleton | No | Config read once at startup |
+| `IOptionsSnapshot<T>` | Scoped | Per-scope | Config may change between requests |
+| `IOptionsMonitor<T>` | Singleton | Yes (notify) | React to config changes in real-time |
+
 ```csharp
 // IOptions<T> - singleton, read once at startup
 public sealed class Service1(IOptions<NormalizerOptions> options)
 {
-    private readonly NormalizerOptions _options = options.Value;
+    private readonly NormalizerOptions opts = options.Value;
 }
 
 // IOptionsSnapshot<T> - scoped, re-reads per request
@@ -170,8 +213,8 @@ public Result<NormalizationModel> ParseConfiguration(string source)
 // Consumer
 var result = parser.ParseConfiguration(source);
 result.Match(
-    onSuccess: model => ProcessModel(model),
-    onError: error => logger.LogWarning("Parse failed: {Error}", error));
+    onSuccess: x => ProcessModel(x),
+    onError: x => logger.LogWarning("Parse failed: {Error}.", x));
 ```
 
 ### When to Use Exceptions vs Result
@@ -183,9 +226,9 @@ result.Match(
 | Infrastructure failure (DB down, network) | Exceptions (let them propagate) |
 | Configuration error (missing settings) | Exceptions at startup |
 
-## Async Best Practices
+## Async/Await Patterns
 
-### Library Code
+### Library Code (ConfigureAwait MANDATORY)
 
 ```csharp
 // Always use ConfigureAwait(false) in library code
@@ -212,6 +255,30 @@ public async Task<IReadOnlyList<T>> GetAllAsync<T>(CancellationToken cancellatio
         items.Add(item);
     }
     return items;
+}
+```
+
+### Async Anti-Patterns
+
+```csharp
+// WRONG - async void (fire-and-forget, exceptions are unobserved)
+public async void ProcessInBackground() { }
+
+// WRONG - blocking on async code
+var result = ProcessAsync(data).Result;         // deadlock risk
+ProcessAsync(data).Wait();                       // deadlock risk
+var result = ProcessAsync(data).GetAwaiter().GetResult(); // deadlock risk
+
+// WRONG - unnecessary async/await (just return the task)
+public async Task<int> GetCountAsync()
+{
+    return await repository.CountAsync(); // unnecessary state machine
+}
+
+// CORRECT - elide async/await when just forwarding
+public Task<int> GetCountAsync()
+{
+    return repository.CountAsync();
 }
 ```
 
@@ -301,6 +368,26 @@ public sealed class AsyncServiceTests
 }
 ```
 
+### Parameterized Tests
+
+```csharp
+[TestFixture]
+public sealed class LifetimeTests
+{
+    [TestCase(ServiceLifetime.Singleton)]
+    [TestCase(ServiceLifetime.Scoped)]
+    [TestCase(ServiceLifetime.Transient)]
+    public void AddDataNormalizer_RegistersWithCorrectLifetime(ServiceLifetime expected)
+    {
+        var services = new ServiceCollection();
+        services.AddDataNormalizer(lifetime: expected);
+
+        var descriptor = services.First(x => x.ServiceType == typeof(INormalizationEngine));
+        Assert.That(descriptor.Lifetime, Is.EqualTo(expected));
+    }
+}
+```
+
 ### IOptions Testing
 
 ```csharp
@@ -313,13 +400,28 @@ public sealed class OptionsTests
         var options = Options.Create(new NormalizerOptions { MaxDepth = 5 });
         var service = new NormalizerService(new FakeEngine(), options, NullLogger<NormalizerService>.Instance);
 
-        // Test that the service respects the configured max depth
-        Assert.That(() => service.NormalizeDeeply(deepObject),
+        Assert.That(
+            () => service.NormalizeDeeply(deepObject),
             Throws.InstanceOf<InvalidOperationException>()
                 .With.Message.Contains("max depth"));
     }
 }
 ```
+
+## Best Practices Summary
+
+| DO | DON'T |
+|----|-------|
+| Use `sealed` on all classes not designed for inheritance | Leave classes unsealed by default |
+| Use primary constructors for DI | Use service locator pattern |
+| Use `ConfigureAwait(false)` in library code | Forget ConfigureAwait in libraries |
+| Use `CancellationToken` in all async methods | Use `async void` |
+| Use `Result<T>` for expected failures | Throw exceptions for control flow |
+| Use `IOptions<T>` for configuration | Hardcode settings |
+| Use `record` for immutable data | Use mutable DTOs |
+| Register with correct lifetimes | Inject scoped into singleton |
+| Use structured logging with `ILogger` | Use string interpolation in logs |
+| Forward `CancellationToken` to all calls | Swallow cancellation |
 
 ## Common Pitfalls
 
