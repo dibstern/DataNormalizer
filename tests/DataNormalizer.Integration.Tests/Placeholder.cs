@@ -1,0 +1,1 @@
+namespace DataNormalizer.Integration.Tests;
