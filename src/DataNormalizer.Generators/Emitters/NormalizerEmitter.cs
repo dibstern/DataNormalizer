@@ -34,7 +34,7 @@ internal static class NormalizerEmitter
                     sb.AppendLine();
                 }
 
-                EmitPublicNormalizeMethod(sb, rootType, rootNode, model);
+                EmitPublicNormalizeMethod(sb, rootType, rootNode, model, allNodes.Count);
                 emittedRootCount++;
             }
         }
@@ -58,7 +58,8 @@ internal static class NormalizerEmitter
         StringBuilder sb,
         RootTypeInfo rootType,
         TypeGraphNode rootNode,
-        NormalizationModel model
+        NormalizationModel model,
+        int typeCount
     )
     {
         var dtoFullName = GetDtoFullName(rootType.FullyQualifiedName, rootNode.TypeName);
@@ -68,7 +69,7 @@ internal static class NormalizerEmitter
             $"    public static DataNormalizer.Runtime.NormalizedResult<{dtoFullName}> Normalize({rootType.FullyQualifiedName} source)"
         );
         sb.AppendLine("    {");
-        sb.AppendLine("        var context = new DataNormalizer.Runtime.NormalizationContext();");
+        sb.AppendLine($"        var context = new DataNormalizer.Runtime.NormalizationContext({typeCount});");
         sb.AppendLine($"        var rootIndex = Normalize{rootNode.TypeName}(source, context);");
         sb.AppendLine($"        var root = context.GetCollection<{dtoFullName}>(\"{typeKey}\")[rootIndex];");
         sb.AppendLine(

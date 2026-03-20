@@ -72,12 +72,11 @@ public sealed class PerformanceTests
         TestContext.Out.WriteLine($"Per object: {perObjectUs:F1}us");
         TestContext.Out.WriteLine($"Throughput: {universes.Length * 1000.0 / totalMs:F0} objects/sec");
 
-        // Threshold: 10 seconds for 10,000 objects (1ms each) is very generous.
-        // As performance improves, tighten this.
+        // Threshold: 50ms for 10,000 objects. Tighten as performance improves.
         Assert.That(
             totalMs,
-            Is.LessThan(10_000),
-            $"Normalizing 10,000 objects took {totalMs}ms — should complete within 10,000ms"
+            Is.LessThan(50),
+            $"Normalizing 10,000 objects took {totalMs}ms — should complete within 50ms"
         );
     }
 
@@ -137,11 +136,11 @@ public sealed class PerformanceTests
         TestContext.Out.WriteLine($"Roundtripped {universes.Length:N0} 7-layer objects in {totalMs}ms");
         TestContext.Out.WriteLine($"Per object: {perObjectUs:F1}us (normalize + denormalize)");
 
-        // Threshold: 10 seconds for 1,000 roundtrips is generous.
+        // Threshold: 10ms for 1,000 roundtrips. Tighten as performance improves.
         Assert.That(
             totalMs,
-            Is.LessThan(10_000),
-            $"Roundtripping 1,000 objects took {totalMs}ms — should complete within 10,000ms"
+            Is.LessThan(10),
+            $"Roundtripping 1,000 objects took {totalMs}ms — should complete within 10ms"
         );
     }
 }

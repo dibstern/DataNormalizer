@@ -6,9 +6,27 @@ namespace DataNormalizer.Runtime;
 /// </summary>
 public sealed class NormalizationContext
 {
-    private readonly Dictionary<string, object> _indexMaps = new();
-    private readonly Dictionary<string, List<object>> _collections = new();
+    private Dictionary<string, object> _indexMaps = new(StringComparer.Ordinal);
+    private Dictionary<string, List<object>> _collections = new(StringComparer.Ordinal);
     private Dictionary<object, int>? _sourceToIndex;
+
+    /// <summary>
+    /// Creates a new NormalizationContext with default capacity.
+    /// </summary>
+    public NormalizationContext() { }
+
+    /// <summary>
+    /// Creates a new NormalizationContext with pre-allocated capacity for the expected number of type keys.
+    /// </summary>
+    /// <param name="estimatedTypeCount">The estimated number of distinct type keys that will be used.</param>
+    public NormalizationContext(int estimatedTypeCount)
+    {
+        if (estimatedTypeCount > 0)
+        {
+            _indexMaps = new Dictionary<string, object>(estimatedTypeCount, StringComparer.Ordinal);
+            _collections = new Dictionary<string, List<object>>(estimatedTypeCount, StringComparer.Ordinal);
+        }
+    }
 
     /// <summary>
     /// Gets an existing index for a DTO or assigns a new one based on value equality.
@@ -51,10 +69,16 @@ public sealed class NormalizationContext
             _collections[typeKey] = list;
         }
 
-        while (list.Count <= index)
-            list.Add(null!);
-
-        list[index] = obj;
+        if (list.Count == index)
+        {
+            list.Add(obj);
+        }
+        else
+        {
+            while (list.Count <= index)
+                list.Add(null!);
+            list[index] = obj;
+        }
     }
 
     /// <summary>
@@ -64,7 +88,8 @@ public sealed class NormalizationContext
     /// <param name="typeKey">The type key identifying the collection.</param>
     /// <returns>A read-only list of normalized DTOs, or an empty list if the key is not found.</returns>
     public IReadOnlyList<T> GetCollection<T>(string typeKey)
-        where T : class => _collections.TryGetValue(typeKey, out var list) ? list.Cast<T>().ToList() : [];
+        where T : class =>
+        _collections.TryGetValue(typeKey, out var list) ? new CastingReadOnlyList<T>(list) : Array.Empty<T>();
 
     /// <summary>
     /// Gets the flat collection of normalized DTOs using <c>typeof(T).Name</c> as the type key.
@@ -99,5 +124,25 @@ public sealed class NormalizationContext
     {
         _sourceToIndex ??= new Dictionary<object, int>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
         _sourceToIndex[source] = index;
+    }
+
+    private sealed class CastingReadOnlyList<T> : IReadOnlyList<T>
+        where T : class
+    {
+        private readonly List<object> _inner;
+
+        public CastingReadOnlyList(List<object> inner) => _inner = inner;
+
+        public T this[int index] => (T)_inner[index];
+
+        public int Count => _inner.Count;
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            for (var i = 0; i < _inner.Count; i++)
+                yield return (T)_inner[i];
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

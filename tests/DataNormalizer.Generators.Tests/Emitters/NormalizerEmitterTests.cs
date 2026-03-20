@@ -371,7 +371,7 @@ public sealed class NormalizerEmitterTests
                 "public static DataNormalizer.Runtime.NormalizedResult<TestApp.NormalizedOrder> Normalize(TestApp.Order source)"
             )
         );
-        Assert.That(result, Does.Contain("var context = new DataNormalizer.Runtime.NormalizationContext();"));
+        Assert.That(result, Does.Contain("var context = new DataNormalizer.Runtime.NormalizationContext(1);"));
         Assert.That(result, Does.Contain("var rootIndex = NormalizeOrder(source, context);"));
         Assert.That(
             result,

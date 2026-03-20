@@ -111,11 +111,11 @@ public sealed class GeneratorPerformanceTests
         TestContext.Out.WriteLine($"Generator avg time for 7-layer graph: {avgMs:F1}ms ({iterations} iterations)");
         TestContext.Out.WriteLine($"Total: {sw.ElapsedMilliseconds}ms");
 
-        // Threshold: 2000ms per run is generous. Tighten as performance improves.
+        // Threshold: 100ms per run. Tighten as performance improves.
         Assert.That(
             avgMs,
-            Is.LessThan(2000),
-            $"Generator took {avgMs:F1}ms avg — should complete within 2000ms for a 7-layer type graph"
+            Is.LessThan(100),
+            $"Generator took {avgMs:F1}ms avg — should complete within 100ms for a 7-layer type graph"
         );
     }
 
