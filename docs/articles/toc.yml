@@ -1,0 +1,6 @@
+- name: Getting Started
+  href: getting-started.md
+- name: Configuration Guide
+  href: configuration.md
+- name: Diagnostics Reference
+  href: diagnostics.md
