@@ -1,12 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <VersionPrefix>0.0.1</VersionPrefix>
     <PackageId>DataNormalizer</PackageId>
     <Description>Source generator that normalizes nested object graphs into flat, deduplicated representations.</Description>
     <Authors>David Stern</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>normalization;source-generator;dto;deduplication;serialization</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageProjectUrl>https://github.com/dstern/DataNormalizer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/dstern/DataNormalizer</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -16,6 +18,7 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,5 +37,6 @@
       Visible="false"
     />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
