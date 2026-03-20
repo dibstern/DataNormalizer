@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DataNormalizer/DataNormalizer.csproj" />
+    <Project Path="src/DataNormalizer.Generators/DataNormalizer.Generators.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DataNormalizer.Tests/DataNormalizer.Tests.csproj" />
+    <Project Path="tests/DataNormalizer.Generators.Tests/DataNormalizer.Generators.Tests.csproj" />
+    <Project Path="tests/DataNormalizer.Integration.Tests/DataNormalizer.Integration.Tests.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/DataNormalizer.Samples/DataNormalizer.Samples.csproj" />
+  </Folder>
+</Solution>
