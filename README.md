@@ -5,6 +5,8 @@ A .NET source generator that normalizes nested object graphs into flat, deduplic
 [![NuGet](https://img.shields.io/nuget/v/DataNormalizer.svg)](https://www.nuget.org/packages/DataNormalizer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+[Documentation](https://dibstern.github.io/DataNormalizer/) | [API Reference](https://dibstern.github.io/DataNormalizer/api/)
+
 ## What It Does
 
 **Before** — nested objects with shared references:
