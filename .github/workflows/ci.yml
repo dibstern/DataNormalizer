@@ -15,21 +15,23 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
+            6.0.x
+            7.0.x
             8.0.x
             9.0.x
             10.0.x
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore DataNormalizer.sln
 
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build DataNormalizer.sln --no-restore
 
       - name: Check formatting
         run: dotnet tool restore && dotnet csharpier check .
 
       - name: Test
-        run: dotnet test --no-build --logger "trx;LogFileName=results.trx"
+        run: dotnet test DataNormalizer.sln --no-build --logger "trx;LogFileName=results.trx"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

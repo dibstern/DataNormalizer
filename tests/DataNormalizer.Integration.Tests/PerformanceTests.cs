@@ -72,11 +72,12 @@ public sealed class PerformanceTests
         TestContext.Out.WriteLine($"Per object: {perObjectUs:F1}us");
         TestContext.Out.WriteLine($"Throughput: {universes.Length * 1000.0 / totalMs:F0} objects/sec");
 
-        // Threshold: 50ms for 10,000 objects. Tighten as performance improves.
+        // Threshold: 200ms for 10,000 objects. CI runners are 2-5x slower than dev machines.
+        // Local baseline: ~26ms. Tighten as performance improves.
         Assert.That(
             totalMs,
-            Is.LessThan(50),
-            $"Normalizing 10,000 objects took {totalMs}ms — should complete within 50ms"
+            Is.LessThan(200),
+            $"Normalizing 10,000 objects took {totalMs}ms — should complete within 200ms"
         );
     }
 
@@ -136,11 +137,12 @@ public sealed class PerformanceTests
         TestContext.Out.WriteLine($"Roundtripped {universes.Length:N0} 7-layer objects in {totalMs}ms");
         TestContext.Out.WriteLine($"Per object: {perObjectUs:F1}us (normalize + denormalize)");
 
-        // Threshold: 10ms for 1,000 roundtrips. Tighten as performance improves.
+        // Threshold: 50ms for 1,000 roundtrips. CI runners are 2-5x slower than dev machines.
+        // Local baseline: ~3ms. Tighten as performance improves.
         Assert.That(
             totalMs,
-            Is.LessThan(10),
-            $"Roundtripping 1,000 objects took {totalMs}ms — should complete within 10ms"
+            Is.LessThan(50),
+            $"Roundtripping 1,000 objects took {totalMs}ms — should complete within 50ms"
         );
     }
 }

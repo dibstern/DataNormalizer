@@ -135,13 +135,9 @@ internal static class NormalizerEmitter
 
             // Check for existing entry (value equality dedup + cycle detection)
             sb.AppendLine();
-            sb.AppendLine($"        var (index, isNew) = context.GetOrAddIndex(\"{typeKey}\", keyDto);");
+            sb.AppendLine($"        var (index, isNew) = context.GetOrAddIndexAndStore(\"{typeKey}\", keyDto);");
             sb.AppendLine("        if (!isNew)");
             sb.AppendLine("            return index;");
-            sb.AppendLine();
-
-            // Add placeholder to collection
-            sb.AppendLine($"        context.AddToCollection(\"{typeKey}\", index, keyDto);");
 
             // Reference-based tracking: record source → index after AddToCollection, before circular recursion
             if (model.UseReferenceTrackingForCycles)
@@ -220,9 +216,7 @@ internal static class NormalizerEmitter
             }
 
             sb.AppendLine();
-            sb.AppendLine($"        var (index, isNew) = context.GetOrAddIndex(\"{typeKey}\", dto);");
-            sb.AppendLine("        if (isNew)");
-            sb.AppendLine($"            context.AddToCollection(\"{typeKey}\", index, dto);");
+            sb.AppendLine($"        var (index, isNew) = context.GetOrAddIndexAndStore(\"{typeKey}\", dto);");
             sb.AppendLine("        return index;");
         }
 

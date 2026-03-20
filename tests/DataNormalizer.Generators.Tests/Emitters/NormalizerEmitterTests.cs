@@ -182,11 +182,11 @@ public sealed class NormalizerEmitterTests
         // Should use two-DTO pattern: keyDto (partial) and fullDto (complete)
         Assert.That(result, Does.Contain("var keyDto = new"));
         Assert.That(result, Does.Contain("var fullDto = new"));
-        // Should use GetOrAddIndex BEFORE recursion for value equality dedup + cycle detection
-        Assert.That(result, Does.Contain("context.GetOrAddIndex"));
+        // Should use GetOrAddIndexAndStore BEFORE recursion for value equality dedup + cycle detection
+        Assert.That(result, Does.Contain("context.GetOrAddIndexAndStore"));
         Assert.That(result, Does.Contain("if (!isNew)"));
         Assert.That(result, Does.Contain("return index;"));
-        // Should have two AddToCollection calls (placeholder + overwrite)
+        // Should have AddToCollection for the fullDto overwrite
         Assert.That(result, Does.Contain("context.AddToCollection"));
         // Should NOT have old source-identity-based patterns
         Assert.That(result, Does.Not.Contain("MarkVisited"));
@@ -219,25 +219,25 @@ public sealed class NormalizerEmitterTests
 
         var result = NormalizerEmitter.Emit(model, nodes);
 
-        // Verify the order: keyDto simple props → GetOrAddIndex → AddToCollection (placeholder) → recursion → fullDto → AddToCollection (overwrite)
+        // Verify the order: keyDto simple props → GetOrAddIndexAndStore → recursion → fullDto → AddToCollection (overwrite)
         var keyDtoIndex = result.IndexOf("var keyDto = new", System.StringComparison.Ordinal);
-        var getOrAddIndex = result.IndexOf("GetOrAddIndex", System.StringComparison.Ordinal);
+        var getOrAddIndex = result.IndexOf("GetOrAddIndexAndStore", System.StringComparison.Ordinal);
         var normalizeTreeNodeCall = result.IndexOf("NormalizeTreeNode(source.Parent", System.StringComparison.Ordinal);
         var fullDtoIndex = result.IndexOf("var fullDto = new", System.StringComparison.Ordinal);
 
         // keyDto should appear first
         Assert.That(keyDtoIndex, Is.GreaterThan(-1), "Should have keyDto creation");
 
-        // GetOrAddIndex (registration) should appear BEFORE the recursive NormalizeTreeNode call
-        Assert.That(getOrAddIndex, Is.GreaterThan(-1), "Should have GetOrAddIndex registration");
+        // GetOrAddIndexAndStore (registration + placeholder storage) should appear BEFORE the recursive NormalizeTreeNode call
+        Assert.That(getOrAddIndex, Is.GreaterThan(-1), "Should have GetOrAddIndexAndStore registration");
         Assert.That(normalizeTreeNodeCall, Is.GreaterThan(-1), "Should have recursive NormalizeTreeNode call");
         Assert.That(
             getOrAddIndex,
             Is.LessThan(normalizeTreeNodeCall),
-            "For circular types, GetOrAddIndex must happen before recursive property assignments"
+            "For circular types, GetOrAddIndexAndStore must happen before recursive property assignments"
         );
 
-        // Simple properties should be set on keyDto BEFORE GetOrAddIndex
+        // Simple properties should be set on keyDto BEFORE GetOrAddIndexAndStore
         var simplePropAssignment = result.IndexOf("keyDto.Label = source.Label;", System.StringComparison.Ordinal);
         Assert.That(
             simplePropAssignment,
@@ -245,13 +245,7 @@ public sealed class NormalizerEmitterTests
             "Simple properties must be set on keyDto before early registration"
         );
 
-        // First AddToCollection (placeholder) should appear BEFORE the recursive call
-        var addToCollection = result.IndexOf("AddToCollection(\"TreeNode\"", System.StringComparison.Ordinal);
-        Assert.That(
-            addToCollection,
-            Is.LessThan(normalizeTreeNodeCall),
-            "AddToCollection (placeholder) must happen before recursive property assignments"
-        );
+        // GetOrAddIndexAndStore handles placeholder storage, so no separate AddToCollection before recursion needed
 
         // fullDto should appear AFTER the recursive call
         Assert.That(fullDtoIndex, Is.GreaterThan(-1), "Should have fullDto creation");
@@ -261,17 +255,13 @@ public sealed class NormalizerEmitterTests
             "fullDto must be created after recursive property assignments"
         );
 
-        // Second AddToCollection (overwrite) should appear AFTER fullDto
-        var secondAddToCollection = result.IndexOf(
-            "AddToCollection(\"TreeNode\"",
-            addToCollection + 1,
-            System.StringComparison.Ordinal
-        );
-        Assert.That(secondAddToCollection, Is.GreaterThan(-1), "Should have second AddToCollection for overwrite");
+        // AddToCollection (overwrite) should appear AFTER fullDto
+        var addToCollection = result.IndexOf("AddToCollection(\"TreeNode\"", System.StringComparison.Ordinal);
+        Assert.That(addToCollection, Is.GreaterThan(-1), "Should have AddToCollection for overwrite");
         Assert.That(
-            secondAddToCollection,
+            addToCollection,
             Is.GreaterThan(fullDtoIndex),
-            "Second AddToCollection (overwrite) must happen after fullDto creation"
+            "AddToCollection (overwrite) must happen after fullDto creation"
         );
     }
 
@@ -410,8 +400,7 @@ public sealed class NormalizerEmitterTests
 
         var result = NormalizerEmitter.Emit(model, new[] { personNode });
 
-        Assert.That(result, Does.Contain("GetOrAddIndex(\"People\""));
-        Assert.That(result, Does.Contain("AddToCollection(\"People\""));
+        Assert.That(result, Does.Contain("GetOrAddIndexAndStore(\"People\""));
         Assert.That(result, Does.Contain("GetCollection<TestApp.NormalizedPerson>(\"People\")"));
     }
 
@@ -478,29 +467,29 @@ public sealed class NormalizerEmitterTests
 
         var result = NormalizerEmitter.Emit(model, new[] { deptNode, empNode });
 
-        // Non-circular Department should be normalized BEFORE GetOrAddIndex
+        // Non-circular Department should be normalized BEFORE GetOrAddIndexAndStore
         var normalizeDeptPos = result.IndexOf("NormalizeDepartment(source.Department", System.StringComparison.Ordinal);
-        var getOrAddPos = result.IndexOf("GetOrAddIndex(\"Employee\"", System.StringComparison.Ordinal);
+        var getOrAddPos = result.IndexOf("GetOrAddIndexAndStore(\"Employee\"", System.StringComparison.Ordinal);
         Assert.That(normalizeDeptPos, Is.GreaterThan(-1), "Should normalize non-circular Department");
         Assert.That(getOrAddPos, Is.GreaterThan(-1));
         Assert.That(
             normalizeDeptPos,
             Is.LessThan(getOrAddPos),
-            "Non-circular Department normalization should happen BEFORE GetOrAddIndex"
+            "Non-circular Department normalization should happen BEFORE GetOrAddIndexAndStore"
         );
 
-        // Circular Mentor should be normalized AFTER GetOrAddIndex
+        // Circular Mentor should be normalized AFTER GetOrAddIndexAndStore
         var normalizeMentorPos = result.IndexOf("NormalizeEmployee(source.Mentor", System.StringComparison.Ordinal);
         Assert.That(
             normalizeMentorPos,
             Is.GreaterThan(getOrAddPos),
-            "Circular Mentor normalization should happen AFTER GetOrAddIndex"
+            "Circular Mentor normalization should happen AFTER GetOrAddIndexAndStore"
         );
 
         // Circular Mentor should be left at defaults on keyDto (excluded from equality)
         Assert.That(result, Does.Not.Contain("source.Mentor is null ? (int?)null : (int?)0"));
 
-        // keyDto should have real normalization for Department (on keyDto, before GetOrAddIndex)
+        // keyDto should have real normalization for Department (on keyDto, before GetOrAddIndexAndStore)
         Assert.That(result, Does.Contain("keyDto.DepartmentIndex = NormalizeDepartment(source.Department, context);"));
 
         // fullDto should reuse keyDto values for non-circular Department
@@ -532,18 +521,18 @@ public sealed class NormalizerEmitterTests
         var model = CreateModel("TestConfig", "TestApp", "TestApp.Employee");
         var result = NormalizerEmitter.Emit(model, new[] { certNode, empNode });
 
-        // Non-circular Certifications collection should be normalized BEFORE GetOrAddIndex
+        // Non-circular Certifications collection should be normalized BEFORE GetOrAddIndexAndStore
         var normalizeCertPos = result.IndexOf(
             "NormalizeCertification(__col[__i], context)",
             System.StringComparison.Ordinal
         );
-        var getOrAddPos = result.IndexOf("GetOrAddIndex(\"Employee\"", System.StringComparison.Ordinal);
+        var getOrAddPos = result.IndexOf("GetOrAddIndexAndStore(\"Employee\"", System.StringComparison.Ordinal);
         Assert.That(normalizeCertPos, Is.GreaterThan(-1), "Should normalize non-circular Certifications");
         Assert.That(getOrAddPos, Is.GreaterThan(-1));
         Assert.That(
             normalizeCertPos,
             Is.LessThan(getOrAddPos),
-            "Non-circular Certifications normalization should happen BEFORE GetOrAddIndex"
+            "Non-circular Certifications normalization should happen BEFORE GetOrAddIndexAndStore"
         );
 
         // keyDto should have real collection indices for non-circular Certifications
@@ -576,8 +565,8 @@ public sealed class NormalizerEmitterTests
         Assert.That(result, Does.Not.Contain("keyDto.FriendsIndices"));
         Assert.That(result, Does.Not.Contain("new int[source.Friends.Count]"));
 
-        // Real normalization should happen AFTER GetOrAddIndex
-        var getOrAddPos = result.IndexOf("GetOrAddIndex(\"Employee\"", System.StringComparison.Ordinal);
+        // Real normalization should happen AFTER GetOrAddIndexAndStore
+        var getOrAddPos = result.IndexOf("GetOrAddIndexAndStore(\"Employee\"", System.StringComparison.Ordinal);
         var normalizeCallPos = result.IndexOf(
             "NormalizeEmployee(__col[__i], context)",
             System.StringComparison.Ordinal
@@ -586,7 +575,7 @@ public sealed class NormalizerEmitterTests
         Assert.That(
             normalizeCallPos,
             Is.GreaterThan(getOrAddPos),
-            "Circular Friends normalization should happen AFTER GetOrAddIndex"
+            "Circular Friends normalization should happen AFTER GetOrAddIndexAndStore"
         );
 
         // fullDto should use local variable for circular Friends

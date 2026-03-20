@@ -54,6 +54,52 @@ public sealed class NormalizationContext
     }
 
     /// <summary>
+    /// Combined GetOrAddIndex + AddToCollection in a single operation.
+    /// Avoids two separate string-key dictionary lookups when registering a new entity.
+    /// Generated code uses this for non-circular types and circular keyDto registration.
+    /// </summary>
+    /// <typeparam name="TDto">The DTO type, which must implement <see cref="IEquatable{T}"/>.</typeparam>
+    /// <param name="typeKey">The type key identifying the collection.</param>
+    /// <param name="dto">The DTO instance to look up or register.</param>
+    /// <returns>A tuple of the index and whether the DTO was newly added.</returns>
+    public (int Index, bool IsNew) GetOrAddIndexAndStore<TDto>(string typeKey, TDto dto)
+        where TDto : class, IEquatable<TDto>
+    {
+        if (!_indexMaps.TryGetValue(typeKey, out var mapObj))
+        {
+            mapObj = new Dictionary<TDto, int>();
+            _indexMaps[typeKey] = mapObj;
+        }
+
+        var map = (Dictionary<TDto, int>)mapObj;
+        if (map.TryGetValue(dto, out var existingIndex))
+            return (existingIndex, false);
+
+        var newIndex = map.Count;
+        map[dto] = newIndex;
+
+        // Also add to collection (avoids separate AddToCollection call)
+        if (!_collections.TryGetValue(typeKey, out var list))
+        {
+            list = [];
+            _collections[typeKey] = list;
+        }
+
+        if (list.Count == newIndex)
+        {
+            list.Add(dto);
+        }
+        else
+        {
+            while (list.Count <= newIndex)
+                list.Add(null!);
+            list[newIndex] = dto;
+        }
+
+        return (newIndex, true);
+    }
+
+    /// <summary>
     /// Adds a normalized object to the flat collection at the specified index.
     /// </summary>
     /// <param name="typeKey">The type key identifying the collection.</param>

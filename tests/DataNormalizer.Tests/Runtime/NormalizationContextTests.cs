@@ -130,6 +130,71 @@ public sealed class NormalizationContextTests
     }
 
     [Test]
+    public void GetOrAddIndexAndStore_FirstObject_ReturnsZeroAndIsNewAndStoresInCollection()
+    {
+        var ctx = new NormalizationContext();
+        var dto = new TestDto("Alice", 30);
+        var (index, isNew) = ctx.GetOrAddIndexAndStore("person", dto);
+        Assert.That(index, Is.EqualTo(0));
+        Assert.That(isNew, Is.True);
+        var collection = ctx.GetCollection<TestDto>("person");
+        Assert.That(collection, Has.Count.EqualTo(1));
+        Assert.That(collection[0], Is.EqualTo(dto));
+    }
+
+    [Test]
+    public void GetOrAddIndexAndStore_EqualObject_ReturnsSameIndexAndNotNew()
+    {
+        var ctx = new NormalizationContext();
+        var dto1 = new TestDto("Alice", 30);
+        var dto2 = new TestDto("Alice", 30);
+        ctx.GetOrAddIndexAndStore("person", dto1);
+        var (index, isNew) = ctx.GetOrAddIndexAndStore("person", dto2);
+        Assert.That(index, Is.EqualTo(0));
+        Assert.That(isNew, Is.False);
+        // Collection should still have exactly one entry
+        var collection = ctx.GetCollection<TestDto>("person");
+        Assert.That(collection, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void GetOrAddIndexAndStore_DifferentObjects_ReturnsDifferentIndices()
+    {
+        var ctx = new NormalizationContext();
+        var (i1, _) = ctx.GetOrAddIndexAndStore("person", new TestDto("Alice", 30));
+        var (i2, _) = ctx.GetOrAddIndexAndStore("person", new TestDto("Bob", 25));
+        Assert.That(i1, Is.EqualTo(0));
+        Assert.That(i2, Is.EqualTo(1));
+        var collection = ctx.GetCollection<TestDto>("person");
+        Assert.That(collection, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void GetOrAddIndexAndStore_CompatibleWithAddToCollectionOverwrite()
+    {
+        // Simulates circular pattern: GetOrAddIndexAndStore for keyDto, then AddToCollection for fullDto overwrite
+        var ctx = new NormalizationContext();
+        var keyDto = new TestDto("Alice", 30);
+        var fullDto = new TestDto("Alice-Full", 30);
+        var (index, isNew) = ctx.GetOrAddIndexAndStore("person", keyDto);
+        Assert.That(isNew, Is.True);
+        // Overwrite with fullDto
+        ctx.AddToCollection("person", index, fullDto);
+        var collection = ctx.GetCollection<TestDto>("person");
+        Assert.That(collection[0], Is.EqualTo(fullDto));
+    }
+
+    [Test]
+    public void GetOrAddIndexAndStore_DifferentTypeKeys_TrackSeparately()
+    {
+        var ctx = new NormalizationContext();
+        var (i1, _) = ctx.GetOrAddIndexAndStore("person", new TestDto("Alice", 30));
+        var (i2, _) = ctx.GetOrAddIndexAndStore("address", new TestDto("Alice", 30));
+        Assert.That(i1, Is.EqualTo(0));
+        Assert.That(i2, Is.EqualTo(0));
+    }
+
+    [Test]
     public void TryGetTrackedIndex_NotTracked_ReturnsFalse()
     {
         var ctx = new NormalizationContext();
