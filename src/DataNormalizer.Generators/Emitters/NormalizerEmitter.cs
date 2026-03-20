@@ -280,11 +280,13 @@ internal static class NormalizerEmitter
                 : GetShortTypeName(prop.TypeFullName);
         var indicesPropName = $"{prop.Name}Indices";
 
-        sb.AppendLine($"        dto.{indicesPropName} = source.{prop.Name} is null");
-        sb.AppendLine("            ? System.Array.Empty<int>()");
-        sb.AppendLine("            : System.Linq.Enumerable.ToArray(");
-        sb.AppendLine(
-            $"                System.Linq.Enumerable.Select(source.{prop.Name}, item => Normalize{elementTypeName}(item, context)));"
+        EmitCollectionForLoop(
+            sb,
+            prop,
+            elementTypeName,
+            $"source.{prop.Name}",
+            $"dto.{indicesPropName}",
+            indent: "        "
         );
     }
 
@@ -313,11 +315,14 @@ internal static class NormalizerEmitter
                 : GetShortTypeName(prop.TypeFullName);
         var varName = $"{ToCamelCase(prop.Name)}Indices";
 
-        sb.AppendLine($"        var {varName} = source.{prop.Name} is null");
-        sb.AppendLine("            ? System.Array.Empty<int>()");
-        sb.AppendLine("            : System.Linq.Enumerable.ToArray(");
-        sb.AppendLine(
-            $"                System.Linq.Enumerable.Select(source.{prop.Name}, item => Normalize{elementTypeName}(item, context)));"
+        EmitCollectionForLoop(
+            sb,
+            prop,
+            elementTypeName,
+            $"source.{prop.Name}",
+            varName,
+            indent: "        ",
+            useVar: true
         );
     }
 
@@ -346,12 +351,73 @@ internal static class NormalizerEmitter
                 : GetShortTypeName(prop.TypeFullName);
         var indicesPropName = $"{prop.Name}Indices";
 
-        sb.AppendLine($"        keyDto.{indicesPropName} = source.{prop.Name} is null");
-        sb.AppendLine("            ? System.Array.Empty<int>()");
-        sb.AppendLine("            : System.Linq.Enumerable.ToArray(");
-        sb.AppendLine(
-            $"                System.Linq.Enumerable.Select(source.{prop.Name}, item => Normalize{elementTypeName}(item, context)));"
+        EmitCollectionForLoop(
+            sb,
+            prop,
+            elementTypeName,
+            $"source.{prop.Name}",
+            $"keyDto.{indicesPropName}",
+            indent: "        "
         );
+    }
+
+    private static bool IsIndexableCollection(CollectionTypeKind kind) =>
+        kind
+            is CollectionTypeKind.Array
+                or CollectionTypeKind.List
+                or CollectionTypeKind.IReadOnlyList
+                or CollectionTypeKind.IList
+                or CollectionTypeKind.ICollection
+                or CollectionTypeKind.ImmutableList
+                or CollectionTypeKind.ImmutableArray;
+
+    private static string GetCountAccessor(CollectionTypeKind kind) =>
+        kind == CollectionTypeKind.Array ? "Length" : "Count";
+
+    private static void EmitCollectionForLoop(
+        StringBuilder sb,
+        AnalyzedProperty prop,
+        string elementTypeName,
+        string sourceExpr,
+        string targetExpr,
+        string indent,
+        bool useVar = false
+    )
+    {
+        var kind = prop.CollectionKind;
+
+        // When declaring a local variable, declare it before the if/else so it's in scope afterwards
+        if (useVar)
+        {
+            sb.AppendLine($"{indent}int[] {targetExpr};");
+        }
+
+        sb.AppendLine($"{indent}if ({sourceExpr} is null)");
+        sb.AppendLine($"{indent}{{");
+        sb.AppendLine($"{indent}    {targetExpr} = System.Array.Empty<int>();");
+        sb.AppendLine($"{indent}}}");
+        sb.AppendLine($"{indent}else");
+        sb.AppendLine($"{indent}{{");
+
+        if (IsIndexableCollection(kind))
+        {
+            var countAccessor = GetCountAccessor(kind);
+            sb.AppendLine($"{indent}    var __col = {sourceExpr};");
+            sb.AppendLine($"{indent}    var __indices = new int[__col.{countAccessor}];");
+            sb.AppendLine($"{indent}    for (var __i = 0; __i < __col.{countAccessor}; __i++)");
+            sb.AppendLine($"{indent}        __indices[__i] = Normalize{elementTypeName}(__col[__i], context);");
+            sb.AppendLine($"{indent}    {targetExpr} = __indices;");
+        }
+        else
+        {
+            // HashSet, IEnumerable — no indexer, use foreach with List builder
+            sb.AppendLine($"{indent}    var __list = new System.Collections.Generic.List<int>();");
+            sb.AppendLine($"{indent}    foreach (var __item in {sourceExpr})");
+            sb.AppendLine($"{indent}        __list.Add(Normalize{elementTypeName}(__item, context));");
+            sb.AppendLine($"{indent}    {targetExpr} = __list.ToArray();");
+        }
+
+        sb.AppendLine($"{indent}}}");
     }
 
     private static string ToCamelCase(string name)

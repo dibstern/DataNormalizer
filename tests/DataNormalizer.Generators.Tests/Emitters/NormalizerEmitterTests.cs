@@ -103,7 +103,7 @@ public sealed class NormalizerEmitterTests
     }
 
     [Test]
-    public void Emit_CollectionOfNormalizableType_GeneratesSelectToArray()
+    public void Emit_CollectionOfNormalizableType_GeneratesForLoop()
     {
         var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
         var nodes = new[]
@@ -122,13 +122,13 @@ public sealed class NormalizerEmitterTests
 
         var result = NormalizerEmitter.Emit(model, nodes);
 
-        Assert.That(result, Does.Contain("System.Linq.Enumerable.ToArray("));
-        Assert.That(
-            result,
-            Does.Contain(
-                "System.Linq.Enumerable.Select(source.PhoneNumbers, item => NormalizePhoneNumber(item, context))"
-            )
-        );
+        // Should use manual for-loop instead of LINQ
+        Assert.That(result, Does.Not.Contain("System.Linq.Enumerable"));
+        Assert.That(result, Does.Contain("var __col = source.PhoneNumbers;"));
+        Assert.That(result, Does.Contain("var __indices = new int[__col.Count];"));
+        Assert.That(result, Does.Contain("for (var __i = 0; __i < __col.Count; __i++)"));
+        Assert.That(result, Does.Contain("__indices[__i] = NormalizePhoneNumber(__col[__i], context);"));
+        Assert.That(result, Does.Contain("dto.PhoneNumbersIndices = __indices;"));
     }
 
     [Test]
@@ -533,7 +533,10 @@ public sealed class NormalizerEmitterTests
         var result = NormalizerEmitter.Emit(model, new[] { certNode, empNode });
 
         // Non-circular Certifications collection should be normalized BEFORE GetOrAddIndex
-        var normalizeCertPos = result.IndexOf("NormalizeCertification(item, context)", System.StringComparison.Ordinal);
+        var normalizeCertPos = result.IndexOf(
+            "NormalizeCertification(__col[__i], context)",
+            System.StringComparison.Ordinal
+        );
         var getOrAddPos = result.IndexOf("GetOrAddIndex(\"Employee\"", System.StringComparison.Ordinal);
         Assert.That(normalizeCertPos, Is.GreaterThan(-1), "Should normalize non-circular Certifications");
         Assert.That(getOrAddPos, Is.GreaterThan(-1));
@@ -544,7 +547,7 @@ public sealed class NormalizerEmitterTests
         );
 
         // keyDto should have real collection indices for non-circular Certifications
-        Assert.That(result, Does.Contain("keyDto.CertificationsIndices = source.Certifications is null"));
+        Assert.That(result, Does.Contain("keyDto.CertificationsIndices = __indices;"));
 
         // fullDto should reuse keyDto values for non-circular Certifications
         Assert.That(result, Does.Contain("fullDto.CertificationsIndices = keyDto.CertificationsIndices;"));
@@ -575,7 +578,10 @@ public sealed class NormalizerEmitterTests
 
         // Real normalization should happen AFTER GetOrAddIndex
         var getOrAddPos = result.IndexOf("GetOrAddIndex(\"Employee\"", System.StringComparison.Ordinal);
-        var normalizeCallPos = result.IndexOf("NormalizeEmployee(item, context)", System.StringComparison.Ordinal);
+        var normalizeCallPos = result.IndexOf(
+            "NormalizeEmployee(__col[__i], context)",
+            System.StringComparison.Ordinal
+        );
         Assert.That(normalizeCallPos, Is.GreaterThan(-1));
         Assert.That(
             normalizeCallPos,

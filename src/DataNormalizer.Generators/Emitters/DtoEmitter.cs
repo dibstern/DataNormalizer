@@ -186,7 +186,7 @@ internal static class DtoEmitter
                         break;
                     case PropertyKind.Collection:
                         sb.Append(
-                            $"System.Linq.Enumerable.SequenceEqual({prop.Name}Indices, other.{prop.Name}Indices)"
+                            $"System.MemoryExtensions.SequenceEqual(System.MemoryExtensions.AsSpan({prop.Name}Indices), System.MemoryExtensions.AsSpan(other.{prop.Name}Indices))"
                         );
                         break;
                     case PropertyKind.Inlined:
@@ -249,8 +249,15 @@ internal static class DtoEmitter
                     sb.AppendLine($"        hash = (hash * 397) ^ {prop.Name}Index.GetHashCode();");
                     break;
                 case PropertyKind.Collection:
-                    sb.AppendLine($"        foreach (var item in {prop.Name}Indices)");
-                    sb.AppendLine("            hash = (hash * 397) ^ item.GetHashCode();");
+                    sb.AppendLine($"        hash = (hash * 397) ^ ({prop.Name}Indices?.Length ?? 0);");
+                    sb.AppendLine($"        if ({prop.Name}Indices is {{ Length: > 0 }})");
+                    sb.AppendLine("        {");
+                    sb.AppendLine($"            hash = (hash * 397) ^ {prop.Name}Indices[0].GetHashCode();");
+                    sb.AppendLine($"            if ({prop.Name}Indices.Length > 1)");
+                    sb.AppendLine(
+                        $"                hash = (hash * 397) ^ {prop.Name}Indices[{prop.Name}Indices.Length - 1].GetHashCode();"
+                    );
+                    sb.AppendLine("        }");
                     break;
                 case PropertyKind.Inlined:
                     if (prop.IsReferenceType)

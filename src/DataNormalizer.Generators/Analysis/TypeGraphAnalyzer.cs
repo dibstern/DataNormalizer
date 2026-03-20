@@ -12,14 +12,17 @@ internal static class TypeGraphAnalyzer
         ImmutableHashSet<string> inlinedTypes,
         ImmutableHashSet<string> explicitTypes,
         ImmutableDictionary<string, TypeConfiguration> typeConfigurations,
-        bool autoDiscover
+        bool autoDiscover,
+        bool copySourceAttributes = false
     )
     {
         var visited = new HashSet<string>();
         var dfsPath = new List<string>();
+        var dfsPathIndex = new Dictionary<string, int>();
         var inProgressSet = new HashSet<string>();
         var cycleParticipants = new HashSet<string>();
         var results = new List<TypeGraphNode>();
+        var fqnCache = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
 
         AnalyzeType(
             rootType,
@@ -27,11 +30,14 @@ internal static class TypeGraphAnalyzer
             explicitTypes,
             typeConfigurations,
             autoDiscover,
+            copySourceAttributes,
             visited,
             dfsPath,
+            dfsPathIndex,
             inProgressSet,
             cycleParticipants,
             results,
+            fqnCache,
             isRoot: true
         );
 
@@ -44,15 +50,18 @@ internal static class TypeGraphAnalyzer
         ImmutableHashSet<string> explicitTypes,
         ImmutableDictionary<string, TypeConfiguration> typeConfigurations,
         bool autoDiscover,
+        bool copySourceAttributes,
         HashSet<string> visited,
         List<string> dfsPath,
+        Dictionary<string, int> dfsPathIndex,
         HashSet<string> inProgressSet,
         HashSet<string> cycleParticipants,
         List<TypeGraphNode> results,
+        Dictionary<ISymbol, string> fqnCache,
         bool isRoot
     )
     {
-        var typeFullName = GetFullyQualifiedName(type);
+        var typeFullName = GetFullyQualifiedName(type, fqnCache);
 
         if (visited.Contains(typeFullName))
             return;
@@ -61,6 +70,7 @@ internal static class TypeGraphAnalyzer
             return;
 
         dfsPath.Add(typeFullName);
+        dfsPathIndex[typeFullName] = dfsPath.Count - 1;
         inProgressSet.Add(typeFullName);
 
         // Get type config if it exists
@@ -76,20 +86,20 @@ internal static class TypeGraphAnalyzer
         foreach (var prop in properties)
         {
             var propType = prop.Type;
-            var propTypeFullName = GetFullyQualifiedName(propType);
+            var propTypeFullName = GetFullyQualifiedName(propType, fqnCache);
             var isNullable = false;
 
             // Unwrap Nullable<T> for classification
             var unwrappedType = UnwrapNullable(propType, out isNullable);
-            var unwrappedFullName = GetFullyQualifiedName(unwrappedType);
+            var unwrappedFullName = GetFullyQualifiedName(unwrappedType, fqnCache);
 
             // Check if this is a collection of complex type
-            var collectionElementType = TryGetCollectionElementType(propType, unwrappedType);
+            var collectionElementType = TryGetCollectionElementType(propType, unwrappedType, fqnCache);
             if (collectionElementType != null)
             {
-                var elementFullName = GetFullyQualifiedName(collectionElementType);
+                var elementFullName = GetFullyQualifiedName(collectionElementType, fqnCache);
 
-                if (IsSimpleType(collectionElementType))
+                if (IsSimpleType(collectionElementType, fqnCache))
                 {
                     // Collection of simple type (e.g., List<string>) — treat as Simple
                     analyzedProperties.Add(
@@ -101,19 +111,21 @@ internal static class TypeGraphAnalyzer
                             IsNullable = isNullable,
                             IsCollection = false,
                             IsReferenceType = unwrappedType.IsReferenceType,
-                            SourceAttributes = GetPropertyAttributes(prop),
+                            SourceAttributes = copySourceAttributes
+                                ? GetPropertyAttributes(prop)
+                                : ImmutableArray<string>.Empty,
                         }
                     );
                     continue;
                 }
 
                 // Collection of complex type
-                var collectionKind = ClassifyCollectionKind(unwrappedType);
+                var collectionKind = ClassifyCollectionKind(unwrappedType, fqnCache);
                 var isCircularRef = inProgressSet.Contains(elementFullName);
                 if (isCircularRef)
                 {
                     hasCircularReference = true;
-                    var targetIdx = dfsPath.IndexOf(elementFullName);
+                    var targetIdx = dfsPathIndex[elementFullName];
                     for (var j = targetIdx; j < dfsPath.Count; j++)
                         cycleParticipants.Add(dfsPath[j]);
                     analyzedProperties.Add(
@@ -128,7 +140,9 @@ internal static class TypeGraphAnalyzer
                             IsCircularReference = true,
                             CollectionKind = collectionKind,
                             IsReferenceType = unwrappedType.IsReferenceType,
-                            SourceAttributes = GetPropertyAttributes(prop),
+                            SourceAttributes = copySourceAttributes
+                                ? GetPropertyAttributes(prop)
+                                : ImmutableArray<string>.Empty,
                         }
                     );
                     continue;
@@ -145,11 +159,14 @@ internal static class TypeGraphAnalyzer
                             explicitTypes,
                             typeConfigurations,
                             autoDiscover,
+                            copySourceAttributes,
                             visited,
                             dfsPath,
+                            dfsPathIndex,
                             inProgressSet,
                             cycleParticipants,
                             results,
+                            fqnCache,
                             isRoot: false
                         );
                     }
@@ -166,14 +183,16 @@ internal static class TypeGraphAnalyzer
                         CollectionElementTypeFullName = elementFullName,
                         CollectionKind = collectionKind,
                         IsReferenceType = unwrappedType.IsReferenceType,
-                        SourceAttributes = GetPropertyAttributes(prop),
+                        SourceAttributes = copySourceAttributes
+                            ? GetPropertyAttributes(prop)
+                            : ImmutableArray<string>.Empty,
                     }
                 );
                 continue;
             }
 
             // Not a collection — check if simple
-            if (IsSimpleType(unwrappedType))
+            if (IsSimpleType(unwrappedType, fqnCache))
             {
                 analyzedProperties.Add(
                     new AnalyzedProperty
@@ -184,7 +203,9 @@ internal static class TypeGraphAnalyzer
                         IsNullable = isNullable,
                         IsCollection = false,
                         IsReferenceType = unwrappedType.IsReferenceType,
-                        SourceAttributes = GetPropertyAttributes(prop),
+                        SourceAttributes = copySourceAttributes
+                            ? GetPropertyAttributes(prop)
+                            : ImmutableArray<string>.Empty,
                     }
                 );
                 continue;
@@ -194,7 +215,7 @@ internal static class TypeGraphAnalyzer
             if (inProgressSet.Contains(unwrappedFullName))
             {
                 hasCircularReference = true;
-                var targetIdx = dfsPath.IndexOf(unwrappedFullName);
+                var targetIdx = dfsPathIndex[unwrappedFullName];
                 for (var j = targetIdx; j < dfsPath.Count; j++)
                     cycleParticipants.Add(dfsPath[j]);
                 analyzedProperties.Add(
@@ -207,7 +228,9 @@ internal static class TypeGraphAnalyzer
                         IsCollection = false,
                         IsCircularReference = true,
                         IsReferenceType = unwrappedType.IsReferenceType,
-                        SourceAttributes = GetPropertyAttributes(prop),
+                        SourceAttributes = copySourceAttributes
+                            ? GetPropertyAttributes(prop)
+                            : ImmutableArray<string>.Empty,
                     }
                 );
                 continue;
@@ -225,7 +248,9 @@ internal static class TypeGraphAnalyzer
                         IsNullable = isNullable,
                         IsCollection = false,
                         IsReferenceType = unwrappedType.IsReferenceType,
-                        SourceAttributes = GetPropertyAttributes(prop),
+                        SourceAttributes = copySourceAttributes
+                            ? GetPropertyAttributes(prop)
+                            : ImmutableArray<string>.Empty,
                     }
                 );
                 continue;
@@ -242,11 +267,14 @@ internal static class TypeGraphAnalyzer
                         explicitTypes,
                         typeConfigurations,
                         autoDiscover,
+                        copySourceAttributes,
                         visited,
                         dfsPath,
+                        dfsPathIndex,
                         inProgressSet,
                         cycleParticipants,
                         results,
+                        fqnCache,
                         isRoot: false
                     );
                     analyzedProperties.Add(
@@ -258,7 +286,9 @@ internal static class TypeGraphAnalyzer
                             IsNullable = isNullable,
                             IsCollection = false,
                             IsReferenceType = unwrappedType.IsReferenceType,
-                            SourceAttributes = GetPropertyAttributes(prop),
+                            SourceAttributes = copySourceAttributes
+                                ? GetPropertyAttributes(prop)
+                                : ImmutableArray<string>.Empty,
                         }
                     );
                 }
@@ -274,7 +304,9 @@ internal static class TypeGraphAnalyzer
                             IsNullable = isNullable,
                             IsCollection = false,
                             IsReferenceType = unwrappedType.IsReferenceType,
-                            SourceAttributes = GetPropertyAttributes(prop),
+                            SourceAttributes = copySourceAttributes
+                                ? GetPropertyAttributes(prop)
+                                : ImmutableArray<string>.Empty,
                         }
                     );
                 }
@@ -291,13 +323,16 @@ internal static class TypeGraphAnalyzer
                         IsNullable = isNullable,
                         IsCollection = false,
                         IsReferenceType = unwrappedType.IsReferenceType,
-                        SourceAttributes = GetPropertyAttributes(prop),
+                        SourceAttributes = copySourceAttributes
+                            ? GetPropertyAttributes(prop)
+                            : ImmutableArray<string>.Empty,
                     }
                 );
             }
         }
 
         dfsPath.RemoveAt(dfsPath.Count - 1);
+        dfsPathIndex.Remove(typeFullName);
         inProgressSet.Remove(typeFullName);
         visited.Add(typeFullName);
 
@@ -346,7 +381,7 @@ internal static class TypeGraphAnalyzer
         return type;
     }
 
-    private static bool IsSimpleType(ITypeSymbol type)
+    private static bool IsSimpleType(ITypeSymbol type, Dictionary<ISymbol, string> fqnCache)
     {
         // Enums
         if (type.TypeKind == TypeKind.Enum)
@@ -374,7 +409,7 @@ internal static class TypeGraphAnalyzer
         }
 
         // Check by fully-qualified name for well-known types
-        var fullName = GetFullyQualifiedName(type);
+        var fullName = GetFullyQualifiedName(type, fqnCache);
         switch (fullName)
         {
             case "System.DateTime":
@@ -392,7 +427,7 @@ internal static class TypeGraphAnalyzer
             return true;
 
         // Dictionary<K,V> is treated as simple
-        if (IsDictionary(type))
+        if (IsDictionary(type, fqnCache))
             return true;
 
         // Value types that aren't enums and aren't recognized above — treat as simple
@@ -408,12 +443,12 @@ internal static class TypeGraphAnalyzer
         return type is IArrayTypeSymbol arrayType && arrayType.ElementType.SpecialType == SpecialType.System_Byte;
     }
 
-    private static bool IsDictionary(ITypeSymbol type)
+    private static bool IsDictionary(ITypeSymbol type, Dictionary<ISymbol, string> fqnCache)
     {
         if (type is INamedTypeSymbol namedType)
         {
             var originalDef = namedType.OriginalDefinition;
-            var name = GetFullyQualifiedName(originalDef);
+            var name = GetFullyQualifiedName(originalDef, fqnCache);
             if (
                 name == "System.Collections.Generic.Dictionary<TKey, TValue>"
                 || name == "System.Collections.Generic.IDictionary<TKey, TValue>"
@@ -427,7 +462,7 @@ internal static class TypeGraphAnalyzer
         // Check interfaces
         foreach (var iface in type.AllInterfaces)
         {
-            var ifaceName = GetFullyQualifiedName(iface.OriginalDefinition);
+            var ifaceName = GetFullyQualifiedName(iface.OriginalDefinition, fqnCache);
             if (
                 ifaceName == "System.Collections.Generic.IDictionary<TKey, TValue>"
                 || ifaceName == "System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>"
@@ -440,7 +475,11 @@ internal static class TypeGraphAnalyzer
         return false;
     }
 
-    private static ITypeSymbol? TryGetCollectionElementType(ITypeSymbol originalType, ITypeSymbol unwrappedType)
+    private static ITypeSymbol? TryGetCollectionElementType(
+        ITypeSymbol originalType,
+        ITypeSymbol unwrappedType,
+        Dictionary<ISymbol, string> fqnCache
+    )
     {
         // Exclude string (implements IEnumerable<char>)
         if (unwrappedType.SpecialType == SpecialType.System_String)
@@ -451,7 +490,7 @@ internal static class TypeGraphAnalyzer
             return null;
 
         // Exclude Dictionary
-        if (IsDictionary(unwrappedType))
+        if (IsDictionary(unwrappedType, fqnCache))
             return null;
 
         // Array — T[]
@@ -462,14 +501,14 @@ internal static class TypeGraphAnalyzer
         if (unwrappedType is INamedTypeSymbol namedType)
         {
             // Check if the type itself is IEnumerable<T>
-            var enumerableElement = GetIEnumerableElementType(namedType);
+            var enumerableElement = GetIEnumerableElementType(namedType, fqnCache);
             if (enumerableElement != null)
                 return enumerableElement;
 
             // Check interfaces
             foreach (var iface in namedType.AllInterfaces)
             {
-                enumerableElement = GetIEnumerableElementType(iface);
+                enumerableElement = GetIEnumerableElementType(iface, fqnCache);
                 if (enumerableElement != null)
                     return enumerableElement;
             }
@@ -478,10 +517,10 @@ internal static class TypeGraphAnalyzer
         return null;
     }
 
-    private static ITypeSymbol? GetIEnumerableElementType(INamedTypeSymbol type)
+    private static ITypeSymbol? GetIEnumerableElementType(INamedTypeSymbol type, Dictionary<ISymbol, string> fqnCache)
     {
         var originalDef = type.OriginalDefinition;
-        var name = GetFullyQualifiedName(originalDef);
+        var name = GetFullyQualifiedName(originalDef, fqnCache);
         if (name == "System.Collections.Generic.IEnumerable<T>" && type.TypeArguments.Length == 1)
         {
             return type.TypeArguments[0];
@@ -534,7 +573,7 @@ internal static class TypeGraphAnalyzer
         return props;
     }
 
-    private static CollectionTypeKind ClassifyCollectionKind(ITypeSymbol type)
+    private static CollectionTypeKind ClassifyCollectionKind(ITypeSymbol type, Dictionary<ISymbol, string> fqnCache)
     {
         // Array — T[]
         if (type is IArrayTypeSymbol)
@@ -543,7 +582,7 @@ internal static class TypeGraphAnalyzer
         if (type is INamedTypeSymbol namedType)
         {
             var originalDef = namedType.OriginalDefinition;
-            var defName = GetFullyQualifiedName(originalDef);
+            var defName = GetFullyQualifiedName(originalDef, fqnCache);
 
             // Check concrete type name first
             switch (defName)
@@ -588,11 +627,14 @@ internal static class TypeGraphAnalyzer
         return attrs.ToImmutable();
     }
 
-    private static string GetFullyQualifiedName(ITypeSymbol type)
+    private static string GetFullyQualifiedName(ITypeSymbol type, Dictionary<ISymbol, string> cache)
     {
-        var display = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        if (display.StartsWith("global::"))
-            return display.Substring("global::".Length);
-        return display;
+        if (cache.TryGetValue(type, out var name))
+            return name;
+        name = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (name.StartsWith("global::"))
+            name = name.Substring("global::".Length);
+        cache[type] = name;
+        return name;
     }
 }

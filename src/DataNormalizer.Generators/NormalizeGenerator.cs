@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Threading;
 using DataNormalizer.Generators.Analysis;
 using DataNormalizer.Generators.Diagnostics;
 using DataNormalizer.Generators.Emitters;
@@ -14,22 +16,19 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var configClasses = context
+        var configs = context
             .SyntaxProvider.ForAttributeWithMetadataName(
                 "DataNormalizer.Attributes.NormalizeConfigurationAttribute",
                 predicate: static (node, _) => node is ClassDeclarationSyntax,
-                transform: static (ctx, _) => ExtractConfigInfo(ctx)
+                transform: static (ctx, ct) => TransformConfig(ctx, ct)
             )
-            .Where(static info => info is not null)
-            .Select(static (info, _) => info!.Value);
+            .Where(static result => result is not null)
+            .Select(static (result, _) => result!.Value);
 
-        context.RegisterSourceOutput(
-            configClasses.Combine(context.CompilationProvider),
-            static (spc, pair) => Execute(spc, pair.Left, pair.Right)
-        );
+        context.RegisterSourceOutput(configs, static (spc, output) => Emit(spc, output));
     }
 
-    private static ConfigInfo? ExtractConfigInfo(GeneratorAttributeSyntaxContext ctx)
+    private static GeneratorOutput? TransformConfig(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
     {
         if (ctx.TargetNode is not ClassDeclarationSyntax classDecl)
             return null;
@@ -38,71 +37,50 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             return null;
 
         var isPartial = classDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
+        var className = symbol.Name;
+        var ns = symbol.ContainingNamespace.IsGlobalNamespace ? "" : symbol.ContainingNamespace.ToDisplayString();
 
-        // Find the Configure method
-        SyntaxReference? configureMethodRef = null;
-        foreach (var member in symbol.GetMembers("Configure"))
+        if (!isPartial)
         {
-            if (
-                member is IMethodSymbol method
-                && method.Parameters.Length == 1
-                && method.Parameters[0].Type.Name == "NormalizeBuilder"
-            )
-            {
-                configureMethodRef = method.DeclaringSyntaxReferences.FirstOrDefault();
-                break;
-            }
-        }
-
-        return new ConfigInfo(
-            ClassName: symbol.Name,
-            FullyQualifiedName: symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-            Namespace: symbol.ContainingNamespace.IsGlobalNamespace ? "" : symbol.ContainingNamespace.ToDisplayString(),
-            IsPartial: isPartial,
-            Location: classDecl.GetLocation(),
-            ConfigureMethodReference: configureMethodRef,
-            ClassSyntaxReference: symbol.DeclaringSyntaxReferences.FirstOrDefault()
-        );
-    }
-
-    private static void Execute(SourceProductionContext spc, ConfigInfo config, Compilation compilation)
-    {
-        if (!config.IsPartial)
-        {
-            spc.ReportDiagnostic(
-                Diagnostic.Create(DiagnosticDescriptors.ConfigClassMustBePartial, config.Location, config.ClassName)
+            return new GeneratorOutput(
+                className,
+                ns,
+                IsPartial: false,
+                Sources: ImmutableArray<GeneratorSourceEntry>.Empty,
+                Diagnostics: ImmutableArray<GeneratorDiagnosticInfo>.Empty
             );
-            return;
         }
 
-        // 1. Get the class declaration syntax from ClassSyntaxReference
-        if (config.ClassSyntaxReference is null)
-            return;
-
-        var classSyntax = config.ClassSyntaxReference.GetSyntax() as ClassDeclarationSyntax;
-        if (classSyntax is null)
-            return;
-
-        var semanticModel = compilation.GetSemanticModel(classSyntax.SyntaxTree);
-
-        // 2. Parse configuration
-        var model = ConfigurationParser.Parse(classSyntax, semanticModel);
+        // Parse configuration — SemanticModel is available from the context
+        var semanticModel = ctx.SemanticModel;
+        var model = ConfigurationParser.Parse(classDecl, semanticModel);
 
         if (model.RootTypes.Length == 0)
-            return; // Empty Configure body — nothing to generate
+        {
+            return new GeneratorOutput(
+                className,
+                ns,
+                IsPartial: true,
+                Sources: ImmutableArray<GeneratorSourceEntry>.Empty,
+                Diagnostics: ImmutableArray<GeneratorDiagnosticInfo>.Empty
+            );
+        }
 
-        // 3. Analyze type graphs for all root types, deduplicate nodes
+        // Analyze type graphs for all root types, deduplicate nodes
         var allNodes = new List<TypeGraphNode>();
         var emittedTypes = new HashSet<string>();
 
         foreach (var rootType in model.RootTypes)
         {
+            ct.ThrowIfCancellationRequested();
+
             var nodes = TypeGraphAnalyzer.Analyze(
                 rootType.TypeSymbol,
                 model.InlinedTypes,
                 model.ExplicitTypes,
                 model.TypeConfigurations,
-                model.AutoDiscover
+                model.AutoDiscover,
+                model.CopySourceAttributes
             );
 
             foreach (var node in nodes)
@@ -114,68 +92,101 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             }
         }
 
-        // 4. Report diagnostics
+        // Generate all source strings and collect diagnostics
+        var sources = ImmutableArray.CreateBuilder<GeneratorSourceEntry>();
+        var diagnostics = ImmutableArray.CreateBuilder<GeneratorDiagnosticInfo>();
+
+        // Report diagnostics for nodes
         foreach (var node in allNodes)
         {
             if (node.HasCircularReference)
             {
-                spc.ReportDiagnostic(
-                    Diagnostic.Create(DiagnosticDescriptors.CircularReference, config.Location, node.TypeName)
-                );
+                diagnostics.Add(new GeneratorDiagnosticInfo("DN0001", node.TypeName));
             }
 
             if (node.Properties.Length == 0)
             {
-                spc.ReportDiagnostic(
-                    Diagnostic.Create(DiagnosticDescriptors.NoPublicProperties, config.Location, node.TypeName)
-                );
+                diagnostics.Add(new GeneratorDiagnosticInfo("DN0003", node.TypeName));
             }
         }
 
-        // 5. Emit DTO classes (one file per type, scoped by config class to avoid hint name collisions)
+        // Emit DTO classes (one file per type, scoped by config class to avoid hint name collisions)
         foreach (var node in allNodes)
         {
+            ct.ThrowIfCancellationRequested();
+
             if (node.Properties.Length == 0)
-                continue; // Skip types with no properties
+                continue;
 
             var dtoSource = DtoEmitter.Emit(node, model.CopySourceAttributes, model.JsonNamingPolicy);
             var dtoHintPrefix = string.IsNullOrEmpty(model.ConfigNamespace)
                 ? model.ConfigClassName
                 : $"{model.ConfigNamespace}.{model.ConfigClassName}";
-            var hintName = string.IsNullOrEmpty(GetNamespace(node.TypeFullName))
+            var hintName = string.IsNullOrEmpty(EmitterHelpers.GetNamespace(node.TypeFullName))
                 ? $"{dtoHintPrefix}.Normalized{node.TypeName}.g.cs"
-                : $"{dtoHintPrefix}.{GetNamespace(node.TypeFullName)}.Normalized{node.TypeName}.g.cs";
-            spc.AddSource(hintName, dtoSource);
+                : $"{dtoHintPrefix}.{EmitterHelpers.GetNamespace(node.TypeFullName)}.Normalized{node.TypeName}.g.cs";
+            sources.Add(new GeneratorSourceEntry(hintName, dtoSource));
         }
 
-        // 6. Emit Normalizer partial class
+        // Emit Normalizer partial class
         var normalizerSource = NormalizerEmitter.Emit(model, allNodes);
         var normalizerHint = string.IsNullOrEmpty(model.ConfigNamespace)
             ? $"{model.ConfigClassName}.Normalizer.g.cs"
             : $"{model.ConfigNamespace}.{model.ConfigClassName}.Normalizer.g.cs";
-        spc.AddSource(normalizerHint, normalizerSource);
+        sources.Add(new GeneratorSourceEntry(normalizerHint, normalizerSource));
 
-        // 7. Emit Denormalizer partial class
+        // Emit Denormalizer partial class
         var denormalizerSource = DenormalizerEmitter.Emit(model, allNodes);
         var denormalizerHint = string.IsNullOrEmpty(model.ConfigNamespace)
             ? $"{model.ConfigClassName}.Denormalizer.g.cs"
             : $"{model.ConfigNamespace}.{model.ConfigClassName}.Denormalizer.g.cs";
-        spc.AddSource(denormalizerHint, denormalizerSource);
+        sources.Add(new GeneratorSourceEntry(denormalizerHint, denormalizerSource));
+
+        return new GeneratorOutput(
+            className,
+            ns,
+            IsPartial: true,
+            Sources: sources.ToImmutable(),
+            Diagnostics: diagnostics.ToImmutable()
+        );
     }
 
-    private static string GetNamespace(string typeFullName)
+    private static void Emit(SourceProductionContext spc, GeneratorOutput output)
     {
-        var lastDot = typeFullName.LastIndexOf('.');
-        return lastDot > 0 ? typeFullName.Substring(0, lastDot) : "";
+        if (!output.IsPartial)
+        {
+            spc.ReportDiagnostic(
+                Diagnostic.Create(DiagnosticDescriptors.ConfigClassMustBePartial, Location.None, output.ClassName)
+            );
+            return;
+        }
+
+        foreach (var diag in output.Diagnostics)
+        {
+            var descriptor = diag.Id switch
+            {
+                "DN0001" => DiagnosticDescriptors.CircularReference,
+                "DN0003" => DiagnosticDescriptors.NoPublicProperties,
+                _ => DiagnosticDescriptors.ConfigClassMustBePartial,
+            };
+            spc.ReportDiagnostic(Diagnostic.Create(descriptor, Location.None, diag.TypeName));
+        }
+
+        foreach (var entry in output.Sources)
+        {
+            spc.AddSource(entry.HintName, entry.Source);
+        }
     }
 }
 
-internal readonly record struct ConfigInfo(
+internal readonly record struct GeneratorSourceEntry(string HintName, string Source);
+
+internal readonly record struct GeneratorDiagnosticInfo(string Id, string TypeName);
+
+internal readonly record struct GeneratorOutput(
     string ClassName,
-    string FullyQualifiedName,
     string Namespace,
     bool IsPartial,
-    Location Location,
-    SyntaxReference? ConfigureMethodReference,
-    SyntaxReference? ClassSyntaxReference
+    ImmutableArray<GeneratorSourceEntry> Sources,
+    ImmutableArray<GeneratorDiagnosticInfo> Diagnostics
 );
