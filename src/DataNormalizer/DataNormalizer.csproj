@@ -9,8 +9,8 @@
     <PackageTags>normalization;source-generator;dto;deduplication;serialization</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageProjectUrl>https://github.com/dstern/DataNormalizer</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/dstern/DataNormalizer</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dibstern/DataNormalizer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dibstern/DataNormalizer</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
