@@ -156,6 +156,28 @@ public sealed class DtoEmitterTests
     }
 
     [Test]
+    public void Emit_GetHashCode_CachesComputedHash()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            SimpleProp("Name", "string", isRef: true),
+            SimpleProp("Age", "int", isRef: false)
+        );
+
+        var result = DtoEmitter.Emit(node);
+
+        // Cache fields should be present in the class body
+        Assert.That(result, Does.Contain("private int _cachedHashCode;"));
+        Assert.That(result, Does.Contain("private bool _hashComputed;"));
+
+        // GetHashCode should check cache first and store result
+        Assert.That(result, Does.Contain("if (_hashComputed) return _cachedHashCode;"));
+        Assert.That(result, Does.Contain("_cachedHashCode = hash;"));
+        Assert.That(result, Does.Contain("_hashComputed = true;"));
+    }
+
+    [Test]
     public void Emit_ArrayProperty_SequenceEqualInEquals()
     {
         var node = CreateNode(

@@ -35,6 +35,11 @@ internal static class DtoEmitter
         sb.AppendLine();
         EmitTypedEquals(sb, dtoName, node.Properties);
         EmitObjectEquals(sb, dtoName);
+
+        // Cache fields for GetHashCode
+        sb.AppendLine("    private int _cachedHashCode;");
+        sb.AppendLine("    private bool _hashComputed;");
+        sb.AppendLine();
         EmitGetHashCode(sb, node.Properties);
 
         sb.AppendLine("}");
@@ -226,6 +231,7 @@ internal static class DtoEmitter
     {
         sb.AppendLine("    public override int GetHashCode()");
         sb.AppendLine("    {");
+        sb.AppendLine("        if (_hashComputed) return _cachedHashCode;");
         sb.AppendLine("        var hash = 17;");
 
         foreach (var prop in properties)
@@ -272,6 +278,8 @@ internal static class DtoEmitter
             }
         }
 
+        sb.AppendLine("        _cachedHashCode = hash;");
+        sb.AppendLine("        _hashComputed = true;");
         sb.AppendLine("        return hash;");
         sb.AppendLine("    }");
     }
