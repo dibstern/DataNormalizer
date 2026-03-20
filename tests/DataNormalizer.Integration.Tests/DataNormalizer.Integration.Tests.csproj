@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- DN0001: Circular reference detected — expected for cycle test types -->
+    <NoWarn>$(NoWarn);DN0001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NUnit" />
@@ -10,5 +12,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DataNormalizer\DataNormalizer.csproj" />
+    <ProjectReference
+      Include="..\..\src\DataNormalizer.Generators\DataNormalizer.Generators.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
+    />
   </ItemGroup>
 </Project>
