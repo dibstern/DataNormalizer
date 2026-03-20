@@ -1,0 +1,46 @@
+name: Deploy Documentation
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy-docs:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore NuGet packages
+        run: dotnet restore src/DataNormalizer/DataNormalizer.csproj
+
+      - name: Build documentation
+        run: dotnet docfx docs/docfx.json
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
