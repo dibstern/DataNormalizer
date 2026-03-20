@@ -45,12 +45,28 @@ public sealed class NormalizationContext
         }
 
         var map = (Dictionary<TDto, int>)mapObj;
+
+#if NET6_0_OR_GREATER
+        ref var indexRef = ref System.Runtime.InteropServices.CollectionsMarshal.GetValueRefOrAddDefault(
+            map,
+            dto,
+            out var exists
+        );
+
+        if (exists)
+            return (indexRef, false);
+
+        var newIndex = map.Count - 1; // Count was already incremented by GetValueRefOrAddDefault
+        indexRef = newIndex; // Write through the ref — no second lookup
+        return (newIndex, true);
+#else
         if (map.TryGetValue(dto, out var existingIndex))
             return (existingIndex, false);
 
         var newIndex = map.Count;
         map[dto] = newIndex;
         return (newIndex, true);
+#endif
     }
 
     /// <summary>
@@ -72,11 +88,26 @@ public sealed class NormalizationContext
         }
 
         var map = (Dictionary<TDto, int>)mapObj;
+
+#if NET6_0_OR_GREATER
+        ref var indexRef = ref System.Runtime.InteropServices.CollectionsMarshal.GetValueRefOrAddDefault(
+            map,
+            dto,
+            out var exists
+        );
+
+        if (exists)
+            return (indexRef, false);
+
+        var newIndex = map.Count - 1; // Count was already incremented by GetValueRefOrAddDefault
+        indexRef = newIndex; // Write through the ref — no second lookup
+#else
         if (map.TryGetValue(dto, out var existingIndex))
             return (existingIndex, false);
 
         var newIndex = map.Count;
         map[dto] = newIndex;
+#endif
 
         // Also add to collection (avoids separate AddToCollection call)
         if (!_collections.TryGetValue(typeKey, out var list))
