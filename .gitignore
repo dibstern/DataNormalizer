@@ -485,3 +485,8 @@ $RECYCLE.BIN/
 
 # Worktrees
 .worktrees
+
+# DocFX generated site
+docs/_site/
+docs/api/*.yml
+docs/api/.manifest
