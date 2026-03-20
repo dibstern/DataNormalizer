@@ -13,6 +13,10 @@
     <PackageVersion Include="PolySharp" Version="1.14.1" />
   </ItemGroup>
 
+  <ItemGroup Label="SourceLink">
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="NUnit" Version="4.3.2" />
     <PackageVersion Include="NUnit3TestAdapter" Version="4.6.0" />
