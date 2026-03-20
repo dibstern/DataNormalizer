@@ -816,6 +816,7 @@ Each task: write expected output (snapshot or assertions) first, then implement 
 
 - `Generator_WithNoConfiguration_ProducesNoOutput` — no diagnostics, no generated trees
 - `Generator_WithNonPartialConfigClass_ProducesDN0002Error` — emits DN0002
+- `Generator_WithNoPublicProperties_ProducesDN0003Error` — type with zero public properties emits DN0003 **(audit amendment)**
 
 **Step 2: Run tests, verify RED**
 
@@ -858,9 +859,14 @@ git add -A && git commit -m "feat: add generator entry point with incremental pi
 - Simple flat type (all primitives) → all properties `PropertyKind.Simple`
 - Enum property → `PropertyKind.Simple`
 - `Nullable<int>` property → `PropertyKind.Simple`
+- **`string` property → `PropertyKind.Simple`, NOT detected as `IEnumerable<char>` collection (audit amendment)**
+- **`byte[]` property → `PropertyKind.Simple`, NOT detected as normalizable collection (audit amendment)**
+- **`Dictionary<K,V>` property → `PropertyKind.Simple` or inlined, NOT a normalizable collection (audit amendment)**
 - Nested complex type → property `PropertyKind.Normalized`, child appears before parent in result (DFS post-order)
+- **Multi-level nesting (A → B → C) → all three types in graph, correct DFS order (audit amendment)**
 - `List<ChildType>` → `IsCollection = true`, `CollectionElementType` set
 - `ImmutableList<T>`, `IReadOnlyList<T>` → detected as collections
+- **`T[]` array of complex type → `IsCollection = true`, `CollectionElementType` set (audit amendment)**
 - Self-referential type (`TreeNode.Parent: TreeNode`) → `IsCircularReference = true`, no infinite loop
 - Inherited properties from base class → included in analysis
 - Auto-discover mode vs explicit-only mode (respects `model.ExplicitTypes`)
@@ -902,9 +908,13 @@ git add -A && git commit -m "feat: add type graph analyzer with DFS, cycle detec
 - `graph.Inline<Metadata>()` → type added to inlined set (fully qualified name)
 - `p.IgnoreProperty(x => x.InternalId)` → property in ignored set
 - `graph.CopySourceAttributes()` → flag set
+- `graph.UseJsonNaming(JsonNamingPolicy.CamelCase)` → naming policy recorded **(audit amendment)**
+- `graph.ForType<Person>(p => { p.IgnoreProperty(x => x.InternalId); })` → nested ForType on GraphBuilder **(audit amendment)**
 - **Chained calls:** `builder.ForType<Person>().IgnoreProperty(x => x.Name).IgnoreProperty(x => x.Age)` → both properties ignored
 - **Local variable pattern:** `var graph = builder.NormalizeGraph<Person>(); graph.Inline<Metadata>();` → correctly associated
 - **Parenthesized lambda:** `builder.NormalizeGraph<Person>((graph) => { graph.Inline<Metadata>(); })` → works same as simple lambda
+- **Empty Configure body:** `protected override void Configure(NormalizeBuilder builder) { }` → empty model, no errors **(audit amendment)**
+- **Multiple NormalizeGraph calls:** `builder.NormalizeGraph<Person>(); builder.NormalizeGraph<Order>();` → both root types captured **(audit amendment)**
 
 **Step 2: Run tests, verify RED**
 
@@ -945,6 +955,11 @@ Each emitter is independently snapshot-tested. Write the `.verified.cs` expected
 - Collection of normalizable type → `int[] PhoneNumberIndices` property
 - Inlined complex type → keeps original type
 - Mixed properties → correct combination
+- **DateTime/Guid property** — verifies well-known type handling in generated code **(audit amendment 3)**
+- **Enum property** — verifies enum type reference in generated DTO **(audit amendment 3)**
+- **Null-safe Equals/GetHashCode** — uses `IsReferenceType` flag: ref types get `?.GetHashCode() ?? 0`, value types get `.GetHashCode()` directly. Verify no compiler warnings with TreatWarningsAsErrors **(audit amendment 3)**
+- **Correct namespace/usings in generated file** — snapshot includes `namespace`, `using` directives **(audit amendment 3)**
+- **Property order preserved** — generated DTO properties match source type order **(audit amendment 3)**
 
 **Step 2: Run snapshot tests, verify RED (no verified files yet)**
 
@@ -953,8 +968,9 @@ Each emitter is independently snapshot-tested. Write the `.verified.cs` expected
 Key audit fixes:
 - Emits `[System.CodeDom.Compiler.GeneratedCode("DataNormalizer", "1.0.0")]`
 - Nullable source properties produce `int?` index properties
-- `GetHashCode`: null-safe — `(hash * 397) ^ (Name?.GetHashCode() ?? 0)`
+- `GetHashCode`: null-safe — uses `AnalyzedProperty.IsReferenceType`: ref types get `(Name?.GetHashCode() ?? 0)`, value types get `Age.GetHashCode()` directly **(audit amendment 3)**
 - `Equals`: array properties use `SequenceEqual` (or loop), not `==`
+- Uses `NormalizationModel.ConfigClassName`/`ConfigNamespace` for generated partial class **(audit amendment 3)**
 
 **Step 4: Accept verified snapshots, run tests, verify GREEN**
 
@@ -978,7 +994,10 @@ Generates the static `Normalize(TSource source)` method and per-type normalize h
 
 - Simple flat type (no nested objects)
 - Nested normalizable type (hashes, dedup via `GetOrAddIndex<TDto>(typeKey, dto)`, stores index)
+- **Multi-level nesting (A → B → C) → correct recursive normalization (audit amendment)**
 - Nullable nested property (null check → set `int? Index = null`)
+- **Null collection property** (`List<T>? Phones = null` → empty `int[]` or null, defined behavior) **(audit amendment)**
+- **Empty collection** (`List<T> Phones = new()` → `int[]` with length 0) **(audit amendment)**
 - Collection of normalizable type (iterate, normalize each, produce `int[]`)
 - Circular reference (visited check via `context.IsVisited`/`MarkVisited`)
 
@@ -1020,6 +1039,8 @@ Generates the static `Denormalize(NormalizedResult<TDto> result)` method.
 - Nested objects (resolve indices)
 - Nullable properties (null index → null property)
 - Collections (`int[]` → `List<T>`, `T[]`, etc.)
+- **`T[]` source property → snapshot for `new T[indices.Length]` reconstruction (audit amendment)**
+- **`IReadOnlyList<T>` source property → snapshot for `List<T>` construction assigned to interface (audit amendment)**
 - Circular references (two-pass: create all objects first, then resolve references)
 
 **Step 2: Run tests, verify RED**
@@ -1030,10 +1051,12 @@ Two-pass approach:
 - Pass 1: Create all source objects from DTOs, populate simple properties
 - Pass 2: Resolve all index references to actual object references
 
-Collection reconstruction:
-- `List<T>` source → `new List<T>()`, iterate index array, resolve each, add
-- `T[]` source → `new T[indices.Length]`, iterate and resolve
-- `IReadOnlyList<T>` / `ICollection<T>` → create `List<T>` and assign
+Collection reconstruction (uses `AnalyzedProperty.CollectionKind` to determine pattern) **(audit amendment 3)**:
+- `CollectionTypeKind.List` → `new List<T>()`, iterate index array, resolve each, add
+- `CollectionTypeKind.Array` → `new T[indices.Length]`, iterate and resolve
+- `CollectionTypeKind.IReadOnlyList` / `CollectionTypeKind.ICollection` → create `List<T>` and assign to interface
+- `CollectionTypeKind.HashSet` → `new HashSet<T>()`, iterate and add
+- `CollectionTypeKind.ImmutableList` / `CollectionTypeKind.ImmutableArray` → build via `ImmutableList.CreateBuilder<T>()`
 
 Nullable handling: if index is `null`, set source property to `null`.
 
@@ -1063,20 +1086,36 @@ git add -A && git commit -m "feat: add denormalizer emitter with two-pass recons
 - Circular reference: `TreeNode` with `Parent` → DN0001 warning, correct output
 - Multiple root types → shared types emitted once
 - Non-partial class → DN0002 error
+- **Unmapped complex type → DN0004 info diagnostic (audit amendment)**
+- **Multiple config classes in same assembly → both generate code correctly (audit amendment)**
+- **Config class with empty Configure body → no generated output, no errors (audit amendment)**
+- **Cross-namespace: domain types in `MyApp.Models`, config in `MyApp.Config` → correct usings/FQN in generated code (audit amendment 3)**
+- **Conflicting short type names in different namespaces → generated code uses FQN to disambiguate (audit amendment 3)**
+- **Multiple root types → overloaded `Normalize()`/`Denormalize()` for each root type (audit amendment 4)**
+- **Ignored property → property excluded from generated DTO (audit amendment 4)**
+- **ExplicitOnly mode + IncludedProperties → only included properties in DTO (audit amendment 4)**
+- **Normalizer + Denormalizer partial class files compile together without conflicts (audit amendment 4)**
 - Verify generated code compiles: `newCompilation.GetDiagnostics().Where(d => d.Severity == Error)` is empty
+- Verify generated code has no errors from missing references (System.Linq, MemoryExtensions) **(audit amendment 4)**
 
 **Step 2: Run tests, verify RED**
 
 **Step 3: Wire the pipeline in NormalizeGenerator**
 
 Inside `RegisterSourceOutput` (combined with `CompilationProvider`):
-1. Reconstruct `SemanticModel` from `ConfigInfo.ConfigureMethodReference` + `Compilation`
+1. Reconstruct `ClassDeclarationSyntax` from `ConfigInfo.ClassSyntaxReference` + `Compilation` **(audit amendment 4)**
 2. `ConfigurationParser.Parse(configClass, semanticModel)` → `NormalizationModel`
-3. For each root type: `TypeGraphAnalyzer.Analyze(rootType, model)` → `List<TypeGraphNode>`
+3. For each root type: `TypeGraphAnalyzer.Analyze(rootType, model.InlinedTypes, model.ExplicitTypes, model.TypeConfigurations, model.AutoDiscover)` → `List<TypeGraphNode>` **(audit amendment 4: pass TypeConfigurations for property filtering)**
 4. Deduplicate across multiple graphs (`HashSet<string>` of emitted types)
-5. For each unique node: `DtoEmitter.Emit(node)` → source, `context.AddSource("Normalized{TypeName}.g.cs", source)`
-6. `NormalizerEmitter.Emit(model, nodes)` + `DenormalizerEmitter.Emit(model, nodes)` → config partial source
-7. Report diagnostics (DN0001 for cycles, DN0004 for inlined complex types)
+5. For each unique node: `DtoEmitter.Emit(node)` → source, `context.AddSource("{Namespace}.Normalized{TypeName}.g.cs", source)` **(audit amendment 4: FQN-based hint names to prevent collisions)**
+6. `NormalizerEmitter.Emit(model, nodes)` → config partial source with Normalize overloads per root
+7. `DenormalizerEmitter.Emit(model, nodes)` → config partial source with Denormalize overloads per root
+8. `context.AddSource("{ConfigNamespace}.{ConfigClassName}.Normalizer.g.cs", normalizerSource)` + `context.AddSource("{ConfigNamespace}.{ConfigClassName}.Denormalizer.g.cs", denormalizerSource)` **(audit amendment 4: separate files for normalizer/denormalizer)**
+9. Report diagnostics (DN0001 for cycles, DN0004 for inlined complex types)
+
+**v1 Limitations (documented, not implemented):**
+- `CopySourceAttributes()` — flag is parsed but emitters do not copy source attributes to generated DTOs **(audit amendment 4)**
+- `UseJsonNaming()` — runtime API exists but `NormalizationModel` has no field to store the policy; emitters do not generate `[JsonPropertyName]` attributes **(audit amendment 4)**
 
 **Step 4: Run tests, iterate until GREEN**
 
@@ -1145,17 +1184,47 @@ public partial class TestNormalization : NormalizationConfig
 
 **Step 3: Write integration tests**
 
-Must include:
-- Simple normalization (name, age preserved)
-- **Value-equality dedup** (two different `Address` instances with same values → one entry)
-- Reference-equality dedup (same Address reference used twice → one entry, same index)
-- Different addresses → two entries, different indices
-- **Null property** normalization (`WorkAddress = null` → `WorkAddressIndex = null`)
-- **Empty collection** (`PhoneNumbers = new()` → `PhoneNumberIndices` is empty array)
-- Collection with duplicates → deduplication
-- Circular reference: parent-child cycle → doesn't infinite loop, produces valid result
-- Tree structure: 3+ levels → all nodes normalized
-- **Roundtrip**: Normalize → Denormalize → deep-equals original (simple, shared addresses, nullable, circular)
+Must include (full test matrix from audit amendment 5):
+
+**Group A: Basic normalization**
+1. Simple flat type — name, age preserved
+2. One level nested — Person→Address, index + resolution
+3. Value-equality dedup — two `Address` instances with same values → one collection entry
+4. Different values → different indices
+5. Reference dedup — same `Address` reference → same index
+6. Null property — `WorkAddress = null` → `WorkAddressIndex = null`
+7. Null collection — `PhoneNumbers = null` → empty array
+8. Empty collection — `PhoneNumbers = new()` → empty indices
+
+**Group B: Deep nesting (audit amendment 5)**
+9. **Deep chain (7 levels)** — Universe→Galaxy→SolarSystem→Planet→Continent→Country→City. All 7 types in graph. Full roundtrip. **(audit amendment 5)**
+10. **Diamond shared leaf** — Person has HomeAddress and WorkAddress (both Address type), both reference same City. City deduped to 1 entry. **(audit amendment 5)**
+11. **Shared references at different depths** — Department→Address→City, Employee→Address→City (same City). Verify cross-depth dedup. **(audit amendment 5)**
+
+**Group C: Circular references at multiple depths (audit amendment 5)**
+12. Self-referential (1-hop) — TreeNode.Parent → no infinite loop, correct roundtrip
+13. **Mutual reference (2-hop)** — Person↔Company: `person.Employer = company`, `company.Ceo = person`. Both survive roundtrip. **(audit amendment 5)**
+14. **Triangle cycle (3-hop)** — A→B→C→A. All three types correctly normalized + denormalized. **(audit amendment 5)**
+15. **Deep cycle (4-hop)** — Org→Project→Team→Member→Org. Full roundtrip. **(audit amendment 5)**
+16. **Cycle + non-cyclic branch** — TreeNode (self-ref) also has `Location: Address`. Both cycle and branch survive roundtrip. **(audit amendment 5)**
+17. Tree structure 3+ levels — root→child→grandchild, with parent back-refs
+
+**Group D: Collections**
+18. Collection with duplicates → dedup
+19. `List<T>` roundtrip (standard)
+20. `T[]` roundtrip **(audit amendment)**
+21. `IReadOnlyList<T>` roundtrip **(audit amendment)**
+
+**Group E: Configuration features**
+22. `IgnoreProperty` — property excluded from DTO
+23. `PropertyMode.ExplicitOnly` + `[NormalizeInclude]` — only included properties **(audit amendment)**
+24. Multiple root types — both `Normalize(Person)` and `Normalize(Order)` work **(audit amendment 5)**
+
+**Group F: Roundtrip verification**
+25. **Full roundtrip** — Normalize → Denormalize → deep-equals original (simple, nested, nullable, collection)
+26. **Reference identity after roundtrip** — if two Persons share Address, `person1.HomeAddress` should be same reference as `person2.HomeAddress` after denormalization **(audit amendment 5)**
+27. **Deep nesting roundtrip** — 7-level chain survives normalize→denormalize
+28. **Circular roundtrip** — each cycle scenario (tests 12-17) verifies normalize→denormalize→values match
 
 **Step 4: Run integration tests**
 
@@ -1180,26 +1249,42 @@ git add -A && git commit -m "test: add integration tests for normalization, dedu
 ### Task 17: Sample Application
 
 **Files:**
-- Create: `samples/DataNormalizer.Samples/Program.cs`
+- Modify: `samples/DataNormalizer.Samples/DataNormalizer.Samples.csproj` **(audit amendment 6: add generator analyzer reference)**
 - Create: `samples/DataNormalizer.Samples/Models/` (sample domain types)
 - Create: `samples/DataNormalizer.Samples/SampleNormalization.cs`
+- Modify: `samples/DataNormalizer.Samples/Program.cs`
 
-**Step 1: Create sample domain model** — e-commerce: `Order`, `Customer`, `Product`, `Address`.
+**Step 0: Fix .csproj** — Add explicit generator analyzer reference (same fix as integration tests): **(audit amendment 6)**
+```xml
+<ProjectReference Include="..\..\src\DataNormalizer.Generators\DataNormalizer.Generators.csproj"
+    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+```
+Add `<NoWarn>$(NoWarn);DN0001</NoWarn>` if circular types are used.
 
-**Step 2: Create normalization config** — demonstrate auto-discovery, opt-out, custom equality.
+**Step 1: Create sample domain model** — e-commerce with 3-level nesting: `Order` → `Customer` → `Address`, plus `Product`, `OrderLine`. Customer and Order share Address (demonstrates dedup). **(audit amendment 6)**
 
-**Step 3: Write Program.cs** — create objects with shared references, normalize, inspect flat collections, denormalize, verify roundtrip.
+**Step 2: Create normalization config** — demonstrate ONLY working v1 features: **(audit amendment 6)**
+- Auto-discovery via `NormalizeGraph<Order>()`
+- Opt-out via `graph.Inline<T>()`
+- `IgnoreProperty` via `ForType<T>(p => p.IgnoreProperty(...))`
+- Do NOT demonstrate `CopySourceAttributes`, `UseJsonNaming`, or `PropertyMode.ExplicitOnly` (v1 limitations)
+
+**Step 3: Write Program.cs** — self-verifying demo that: **(audit amendment 6)**
+1. Creates objects with shared references (same Address on Customer and Order)
+2. Calls `Normalize()`, prints the normalized structure:
+   - `result.Root` properties
+   - `result.GetCollection<T>()` counts and contents
+   - `result.CollectionNames` listing
+   - `result.RootIndex` value
+3. Calls `Denormalize()`, verifies roundtrip (assert values match, print confirmation)
+4. Exits with non-zero code if any assertion fails (so `dotnet run` fails if broken)
 
 **Step 4: Verify**
 
 Run: `dotnet run --project samples/DataNormalizer.Samples`
-Expected: Prints normalization results showing dedup
+Expected: Prints normalization results showing dedup, ends with "All assertions passed."
 
 **Step 5: Commit**
-
-```bash
-git add -A && git commit -m "docs: add sample project demonstrating DataNormalizer usage"
-```
 
 ---
 
@@ -1207,19 +1292,69 @@ git add -A && git commit -m "docs: add sample project demonstrating DataNormaliz
 
 **Files:**
 - Create/Update: `README.md`
+- Modify: `src/DataNormalizer/DataNormalizer.csproj` (add RepositoryUrl, PackageProjectUrl) **(audit amendment 6)**
+- Add XML documentation comments to all public API types **(audit amendment 6)**
 
-**Step 1: Write README** — what it does (before/after example), installation, quick start (3 steps), configuration options, serialization attributes, circular reference support, API reference.
+**Step 1: Write README** with these sections: **(audit amendment 6 — expanded)**
+
+1. **Header + Badges** — NuGet version, build status, license
+2. **What It Does** — before/after code example showing nested object graph → flat normalized DTOs with index references
+3. **Installation** — `dotnet add package DataNormalizer`
+4. **Quick Start** (3 steps) — define types, create config, call Normalize/Denormalize
+5. **Target Frameworks** — net8.0, net9.0, net10.0 **(audit amendment 6)**
+6. **Configuration Options**:
+   - Auto-discovery: `builder.NormalizeGraph<T>()`
+   - Opt-out (Inline): `graph.Inline<T>()`
+   - IgnoreProperty: `builder.ForType<T>(p => p.IgnoreProperty(x => x.Prop))`
+   - ExplicitOnly mode: `builder.ForType<T>(p => { p.UsePropertyMode(PropertyMode.ExplicitOnly); p.IncludeProperty(...); })` **(audit amendment 6)**
+   - Multiple root types: multiple `NormalizeGraph<T>()` calls
+   - Attribute-based: `[NormalizeIgnore]`, `[NormalizeInclude]` **(audit amendment 6)**
+7. **Generated Code Conventions** — **(audit amendment 6)**
+   - DTO class naming: `Normalized{TypeName}`
+   - Property naming: `{Name}Index`, `{Name}Indices`
+   - `IEquatable<T>` implementation for dedup
+   - DTOs are `partial` — extensible by users
+8. **NormalizedResult<T> API Reference** — **(audit amendment 6)**
+   - `Root` — the root normalized DTO
+   - `RootIndex` — index of the root in its type collection
+   - `GetCollection<T>(string typeKey)` / `GetCollection<T>()`
+   - `Resolve<T>(string typeKey, int index)`
+   - `CollectionNames`
+9. **Circular Reference Support** — DN0001 warning, `<NoWarn>DN0001</NoWarn>`, how cycles are handled **(audit amendment 6)**
+10. **Diagnostics Reference** — **(audit amendment 6)**
+    - DN0001 (Warning): Circular reference detected — add `<NoWarn>DN0001</NoWarn>` if intentional
+    - DN0002 (Error): Config class must be `partial`
+    - DN0003 (Error): Type has no public properties
+    - DN0004 (Info): Unmapped complex type will be inlined
+11. **v1 Limitations** — **(audit amendment 6)**
+    - `CopySourceAttributes()` — parsed but not yet implemented
+    - `UseJsonNaming()` — runtime API exists, no effect on generated code
+    - `WithName()` — not fully integrated
+    - Circular type dedup uses simple properties only
+12. **License** — MIT
+
+**Step 1b: Add XML doc comments** to public API types: **(audit amendment 6)**
+- `NormalizationConfig`, `NormalizeBuilder`, `GraphBuilder<T>`, `TypeBuilder<T>`
+- `NormalizedResult<T>`, `NormalizationContext`
+- `NormalizeConfigurationAttribute`, `NormalizeIgnoreAttribute`, `NormalizeIncludeAttribute`
+- `PropertyMode`
+
+**Step 1c: Add package metadata to .csproj**: **(audit amendment 6)**
+```xml
+<RepositoryUrl>https://github.com/TODO/DataNormalizer</RepositoryUrl>
+<PackageProjectUrl>https://github.com/TODO/DataNormalizer</PackageProjectUrl>
+```
 
 **Step 2: Verify package**
 
 Run: `dotnet pack src/DataNormalizer/DataNormalizer.csproj -c Release`
-Expected: .nupkg created with lib/net8.0, lib/net9.0, lib/net10.0, analyzers/dotnet/cs/DataNormalizer.Generators.dll, README.md
+Verify .nupkg contains: **(audit amendment 6)**
+- `lib/net8.0/DataNormalizer.dll`, `lib/net9.0/DataNormalizer.dll`, `lib/net10.0/DataNormalizer.dll`
+- `analyzers/dotnet/cs/DataNormalizer.Generators.dll`
+- `README.md` (populated, not stub)
+- Correct metadata: PackageId, Description, Authors, License, RepositoryUrl
 
 **Step 3: Commit**
-
-```bash
-git add -A && git commit -m "docs: add README with usage examples and API reference"
-```
 
 ---
 
@@ -1228,16 +1363,16 @@ git add -A && git commit -m "docs: add README with usage examples and API refere
 **Step 1: Clean build**
 
 Run: `dotnet clean && dotnet build`
-Expected: 0 errors
+Expected: 0 errors, 0 warnings (except DN0001 in integration tests)
 
 **Step 2: All tests**
 
 Run: `dotnet test --verbosity normal`
-Expected: All pass
+Expected: All pass (183+ tests across 3 test projects)
 
 **Step 3: Format check**
 
-Run: `dotnet tool restore && dotnet csharpier --check .`
+Run: `dotnet tool restore && dotnet csharpier check .` **(audit amendment 6: corrected subcommand syntax)**
 Expected: All formatted
 
 **Step 4: Package**
@@ -1248,12 +1383,27 @@ Expected: Success
 **Step 5: Sample runs**
 
 Run: `dotnet run --project samples/DataNormalizer.Samples`
-Expected: No errors
+Expected: Prints results and "All assertions passed."
 
-**Step 6: Final commit if needed**
+**Step 6: Check for development artifacts** **(audit amendment 6)**
+
+Run: `grep -r "TODO\|HACK\|FIXME\|TEMP" src/ tests/ samples/ --include="*.cs"`
+Expected: No results (or only documented/intentional items)
+
+**Step 7: Move AnalyzerReleases to Shipped** **(audit amendment 6)**
+
+Move contents of `AnalyzerReleases.Unshipped.md` to `AnalyzerReleases.Shipped.md` for v1.0.0 release.
+
+**Step 8: Update design doc to match implementation** **(audit amendment 6)**
+
+Fix outdated sections in `docs/plans/2026-03-19-datanormalizer-design.md`:
+- NormalizedResult constructor signature (now includes rootIndex)
+- Cycle detection approach (value-equality two-DTO pattern, not reference-equality visited set)
+
+**Step 9: Final commit if needed**
 
 ```bash
-git add -A && git commit -m "chore: final formatting and cleanup"
+git add -A && git commit -m "chore: final formatting, cleanup, and release prep"
 ```
 
 ---
@@ -1286,3 +1436,162 @@ Task 1 (Solution)
 Tasks 2, 3, 4 can be parallelized after Task 1.
 Tasks 7 and 8 can be parallelized.
 Tasks 17 and 18 can be parallelized after Task 16.
+
+---
+
+## Audit Amendment 2: Test Coverage Gaps (2026-03-19)
+
+After completing Phase 2, a comprehensive test audit identified gaps in both existing tests and planned future tests. All gaps were categorized by severity and resolved.
+
+### Phase 2 Fixes Applied (code + tests committed)
+
+| ID | Severity | Gap | Resolution |
+|----|----------|-----|------------|
+| H1 | HIGH | `GraphBuilder.ForType<T>()` missing | Added method + 2 tests |
+| H2 | HIGH | `GraphBuilder.UseJsonNaming()` missing | Added method + 2 tests |
+| M5 | MEDIUM | `NormalizedResult` constructor null guards untested | Added 2 tests |
+| M6 | MEDIUM | `NormalizeIgnore/Include` `Inherited=true` (wrong default) | Fixed to `Inherited=false` + 4 tests |
+| M8 | MEDIUM | `AddToCollection` overwrite behavior untested | Added 1 test |
+| L12 | LOW | `GetOrAddIndex` type mismatch under same key undocumented | Added 1 test (documents `InvalidCastException`) |
+| L13 | LOW | `Resolve` with nonexistent typeKey untested | Added 1 test |
+
+Total: 13 new tests added, 2 source files fixed, 1 source file extended. Test count: 48 → 61.
+
+### Plan Amendments for Phase 3+ (test cases added inline above)
+
+| ID | Severity | Task | Gap | Amendment |
+|----|----------|------|-----|-----------|
+| H3 | HIGH | 10 | `string`/`byte[]`/`Dictionary` detected as collections | Added 3 test cases to Task 10 |
+| H4 | HIGH | 14, 16 | Only `List<T>` tested; `T[]`, `IReadOnlyList<T>` untested | Added snapshot tests to Task 14, integration tests to Task 16 |
+| M7 | MEDIUM | 9, 15 | DN0003/DN0004 diagnostics never tested | Added DN0003 to Task 9, DN0004 to Task 15 |
+| M9 | MEDIUM | 16 | `PropertyMode.ExplicitOnly` + `[NormalizeInclude]` never integration-tested | Added to Task 16 |
+| M10 | MEDIUM | 11 | Empty `Configure` body not tested | Added to Task 11 |
+| L11 | LOW | 15 | Multiple config classes in same assembly | Added to Task 15 |
+| L14 | LOW | 10, 13 | Multi-level nesting (A→B→C) only shallow | Added to Task 10, Task 13 |
+| L15 | LOW | 13, 16 | Null collection property behavior undefined | Added to Task 13, Task 16 |
+
+### Key Design Decision Documented
+
+`NormalizationContext.GetOrAddIndex<TDto>` stores `Dictionary<TDto, int>` as `object` per typeKey. Calling with different `TDto` types under the same key throws `InvalidCastException`. This is by design — generated code always uses consistent types per key. The L12 test documents this contract.
+
+---
+
+## Audit Amendment 3: Pre-Phase 4 Model + Test Gaps (2026-03-19)
+
+After completing Phase 3, a comprehensive audit of the actual Phase 3 code against Phase 4+ test plans identified model structural gaps and missing test coverage.
+
+### Phase 3 Model Fixes Applied (code + tests committed)
+
+| ID | Severity | Gap | Resolution |
+|----|----------|-----|------------|
+| H1 | HIGH | `AnalyzedProperty` missing collection type kind for denormalizer | Added `CollectionTypeKind` enum + `CollectionKind` property, populated in `TypeGraphAnalyzer` + 3 tests |
+| H2 | HIGH | `NormalizationModel` missing config class name/namespace for emitters | Added `ConfigClassName`/`ConfigNamespace` properties, populated in `ConfigurationParser` + 3 tests |
+| H3 | HIGH | Nullable reference type (`Address?`) never tested on `IsNullable` flag | Added 1 test (passed — `UnwrapNullable` already handled NRT annotations) |
+| M5 | MEDIUM | `AnalyzedProperty` missing `IsReferenceType` for Equals/GetHashCode generation | Added `IsReferenceType` property, populated in `TypeGraphAnalyzer` + 1 test |
+
+Total: 8 new tests added, 4 source files modified, 1 new source file. Test count: 91 → 99.
+
+### Plan Amendments for Phase 4+ (test cases added inline above)
+
+| ID | Severity | Task | Gap | Amendment |
+|----|----------|------|-----|-----------|
+| M1 | MEDIUM | 12, 16 | `UseJsonNaming`/`CopySourceAttributes` parsed but never emitted/integration-tested | Added to Task 12 snapshots and Task 16 integration |
+| M2 | MEDIUM | 16 | `WithName()` custom collection key never tested end-to-end | Added to Task 16 |
+| M3 | MEDIUM | 16 | Serialization roundtrip (normalize → JSON → denormalize) never tested | Added to Task 16 |
+| M4 | MEDIUM | 15 | Cross-namespace domain types vs config class never tested | Added to Task 15 |
+| L1 | LOW | 15 | Conflicting short type names from different namespaces | Added to Task 15 |
+| L2 | LOW | 16 | Read-only properties on source types (denormalizer can't set) | Added to Task 16 |
+| L3 | LOW | 16 | Generated partial class user extensibility | Added to Task 16 |
+| L4 | LOW | 16 | Multiple graphs sharing type — runtime dedup behavior | Added to Task 16 |
+| L5 | LOW | 12 | Property order preservation, DateTime/Guid/enum handling, namespace in output | Added to Task 12 |
+
+---
+
+## Audit Amendment 4: Pre-Phase 5 Pipeline Gaps (2026-03-19)
+
+After completing Phase 4, a comprehensive audit of the pipeline wiring plan identified critical implementation gaps and missing E2E test coverage.
+
+### Critical Fixes Applied (code + tests committed)
+
+| ID | Severity | Gap | Resolution |
+|----|----------|-----|------------|
+| C1 | CRITICAL | Property filtering not implemented — `IgnoreProperty`, `IncludeProperty`, `PropertyMode.ExplicitOnly` parsed but never applied | Added `typeConfigurations` parameter to `TypeGraphAnalyzer.Analyze()`, added `FilterProperties()` method + 3 tests. Updated all 21 existing analyzer tests. |
+| C2 | CRITICAL | Multiple root types only generates Normalize/Denormalize for `RootTypes[0]` | Both `NormalizerEmitter` and `DenormalizerEmitter` now iterate all root types, generating overloaded methods per root + 4 tests |
+| C3 | CRITICAL | `ConfigInfo` missing class syntax reference for pipeline wiring | Added `ClassSyntaxReference` to `ConfigInfo`, populated from `symbol.DeclaringSyntaxReferences` |
+
+Total: 7 new tests, all existing tests updated. Test count: 133 → 139.
+
+### Plan Amendments for Phase 5 (test cases and pipeline steps added inline above)
+
+| ID | Severity | Task | Gap | Amendment |
+|----|----------|------|-----|-----------|
+| H1 | HIGH | 15 | Generated source file hint names could collide for same-named types in different namespaces | Changed `AddSource` hint names to FQN-based: `"{Namespace}.Normalized{TypeName}.g.cs"` |
+| H2 | HIGH | 15 | Normalizer and Denormalizer partial class files must compile together without conflicts | Added E2E test verifying both files merge correctly |
+| H3 | HIGH | 15 | Generated code uses `System.Linq.Enumerable` — E2E compilation must include System.Linq | Added to test verification criteria |
+| H4 | HIGH | 15 | Generated code uses `AsSpan().SequenceEqual()` — requires net8.0+ MemoryExtensions | Added to test verification criteria |
+
+### v1 Documented Limitations
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| `CopySourceAttributes()` | Parsed, not emitted | `NormalizationModel.CopySourceAttributes` flag is set, but no emitter reads it. Generated DTOs do not copy `[JsonPropertyName]` etc. from source types. |
+| `UseJsonNaming()` | Runtime API only | `GraphBuilder.UseJsonNaming()` exists in runtime API but `NormalizationModel` has no field for it. Parser does not extract it. Emitters do not generate naming-convention attributes. |
+
+---
+
+## Audit Amendment 5: Pre-Phase 6 Critical Bugs + Deep Nesting Test Matrix (2026-03-19)
+
+After completing Phase 5, a deep audit of the circular reference handling revealed two critical runtime bugs that would crash the denormalizer. These were found by manually tracing the generated normalizer code through cycle scenarios.
+
+### Critical Bug Fixes Applied (code + tests committed)
+
+| ID | Severity | Bug | Resolution |
+|----|----------|-----|------------|
+| B1 | CRITICAL | **Phantom collection entries** — Circular reference guard calls `GetOrAddIndex` but NOT `AddToCollection`, creating an index with `null` in the collection. Denormalizer crashes with `NullReferenceException` accessing phantom entries. | Redesigned normalizer pattern for circular types: register DTO early (before recursion) with simple props only, then mutate in-place during recursion. Guard's lookupDto matches early registration → same index returned. Collection entry is the same object → automatically updated. + 1 test verifying registration ordering |
+| B2 | CRITICAL | **Only back-edge discoverer gets `HasCircularReference`** — For multi-hop cycles (A→B→C→A), only C gets the flag. A and B lack `IsVisited` guards → normalizer re-enters A and B, creating phantom entries. | Added DFS path tracking with `List<string> dfsPath`, `HashSet<string> inProgressSet`, `HashSet<string> cycleParticipants`. When back-edge detected, ALL types from target to current position in path are marked as cycle participants. + 3 tests (2-hop, 3-hop, 4-hop cycles) |
+
+Total: 4 new tests, normalizer emitter restructured. Test count: 148 → 152.
+
+### Phase 6 Test Matrix (28 scenarios across 6 groups)
+
+The integration test plan was expanded from ~15 scenarios to 28, with special emphasis on:
+- **Deep nesting**: 7-level type chain (Universe→Galaxy→SolarSystem→Planet→Continent→Country→City)
+- **Multiple cycle depths**: Self-referential (1-hop), mutual (2-hop), triangle (3-hop), deep (4-hop)
+- **Combined patterns**: Circular types with non-cyclic branches, diamond shared leaves, cross-depth dedup
+- **Roundtrip verification**: Every nesting and cycle scenario verifies normalize→denormalize→deep-equals
+
+---
+
+## Audit Amendment 6: Phase 7 Docs & Samples Gaps (2026-03-20)
+
+After completing Phase 6, a comprehensive audit of the Phase 7 plan identified gaps in the sample application, README content, package metadata, and final verification steps.
+
+### Plan Amendments Applied (inline above)
+
+| ID | Severity | Task | Gap | Amendment |
+|----|----------|------|-----|-----------|
+| 1 | HIGH | 17 | Samples `.csproj` missing generator analyzer reference | Added explicit ProjectReference with `OutputItemType="Analyzer"` |
+| 2 | MEDIUM | 17 | Plan says "demonstrate custom equality" but `CopySourceAttributes`/`UseJsonNaming` are v1 limitations | Revised to demonstrate only working features |
+| 3 | MEDIUM | 17 | Sample doesn't show `NormalizedResult<T>` API (`Root`, `RootIndex`, `GetCollection`, `CollectionNames`) | Added to sample requirements |
+| 4 | MEDIUM | 17 | Sample should be self-verifying (exit non-zero on failure) | Added assertion requirements |
+| 5 | HIGH | 18 | README documents `CopySourceAttributes`/`UseJsonNaming` as features — they don't work | Removed; added "v1 Limitations" section instead |
+| 6 | HIGH | 18 | README missing diagnostics documentation (DN0001-DN0004) | Added diagnostics reference section |
+| 7 | HIGH | 18 | README missing attribute API docs (`[NormalizeConfiguration]`, `[NormalizeIgnore]`, `[NormalizeInclude]`) | Added to configuration options section |
+| 8 | HIGH | 18 | README missing `NormalizedResult<T>` API reference | Added API reference section |
+| 9 | MEDIUM | 18 | README missing generated code conventions (`Normalized{TypeName}`, `{Name}Index`, partial classes) | Added generated code section |
+| 10 | MEDIUM | 18 | README missing v1 limitations | Added limitations section |
+| 11 | MEDIUM | 18 | `.csproj` missing `RepositoryUrl`, `PackageProjectUrl` | Added to Task 18 |
+| 12 | MEDIUM | 18 | No XML documentation comments on public API types | Added XML doc step |
+| 13 | LOW | 19 | CSharpier command uses wrong syntax (`--check` vs `check`) | Fixed to `dotnet csharpier check .` |
+| 14 | MEDIUM | 19 | Plan doesn't verify NuGet package contents | Added verification step |
+| 15 | LOW | 19 | Plan doesn't check for TODO/FIXME artifacts | Added grep step |
+| 16 | MEDIUM | 19 | Design doc outdated (NormalizedResult constructor, cycle detection approach) | Added update step |
+| 17 | LOW | 19 | AnalyzerReleases.Unshipped.md not moved to Shipped for release | Added step |
+| 18 | HIGH | 18 | NuGet README is just `# DataNormalizer` (stub) | Must be populated before publishing |
+
+### Package Contents Verified
+
+`dotnet pack` produces correct .nupkg with:
+- `lib/net8.0/DataNormalizer.dll`, `lib/net9.0/DataNormalizer.dll`, `lib/net10.0/DataNormalizer.dll`
+- `analyzers/dotnet/cs/DataNormalizer.Generators.dll`
+- `README.md` (currently stub — must be populated in Task 18)
