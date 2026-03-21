@@ -128,6 +128,32 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             sources.Add(new GeneratorSourceEntry(hintName, dtoSource));
         }
 
+        // Emit Container classes (one per root type)
+        foreach (var rootType in model.RootTypes)
+        {
+            ct.ThrowIfCancellationRequested();
+            TypeGraphNode? rootNode = null;
+            for (var i = 0; i < allNodes.Count; i++)
+            {
+                if (allNodes[i].TypeFullName == rootType.FullyQualifiedName)
+                {
+                    rootNode = allNodes[i];
+                    break;
+                }
+            }
+            if (rootNode == null)
+                continue;
+            var containerSource = ContainerEmitter.Emit(rootNode, allNodes, model.JsonNamingPolicy);
+            var containerHintPrefix = string.IsNullOrEmpty(model.ConfigNamespace)
+                ? model.ConfigClassName
+                : $"{model.ConfigNamespace}.{model.ConfigClassName}";
+            var containerNs = EmitterHelpers.GetNamespace(rootNode.TypeFullName);
+            var containerHintName = string.IsNullOrEmpty(containerNs)
+                ? $"{containerHintPrefix}.Normalized{rootNode.TypeName}Result.g.cs"
+                : $"{containerHintPrefix}.{containerNs}.Normalized{rootNode.TypeName}Result.g.cs";
+            sources.Add(new GeneratorSourceEntry(containerHintName, containerSource));
+        }
+
         // Emit Normalizer partial class
         var normalizerSource = NormalizerEmitter.Emit(model, allNodes);
         var normalizerHint = string.IsNullOrEmpty(model.ConfigNamespace)
