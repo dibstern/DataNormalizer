@@ -24,6 +24,6 @@ public sealed class SmokeTests
         var result = BasicNormalizationConfig.Normalize(person);
 
         Assert.That(result, Is.Not.Null);
-        Assert.That(result.Root, Is.Not.Null);
+        Assert.That(result.PersonList.Length, Is.GreaterThan(result.RootIndex));
     }
 }

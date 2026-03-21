@@ -18,17 +18,18 @@ public sealed class ConfigFeatureTests
         };
 
         var result = IgnorePropertyConfig.Normalize(employee);
+        var root = result.EmployeeList[result.RootIndex];
 
         // NormalizedEmployee should NOT have an Age property
         // Verify via reflection that the DTO type doesn't have "Age"
-        var dtoType = result.Root.GetType();
+        var dtoType = root.GetType();
         var ageProperty = dtoType.GetProperty("Age");
         Assert.That(ageProperty, Is.Null, "Age should be excluded from generated DTO");
 
         // Other properties should be present
-        Assert.That(result.Root.Name, Is.EqualTo("Bob"));
-        Assert.That(result.Root.Department, Is.EqualTo("Engineering"));
-        Assert.That(result.Root.Office, Is.EqualTo("A101"));
+        Assert.That(root.Name, Is.EqualTo("Bob"));
+        Assert.That(root.Department, Is.EqualTo("Engineering"));
+        Assert.That(root.Office, Is.EqualTo("A101"));
     }
 
     [Test]

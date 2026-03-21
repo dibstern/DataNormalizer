@@ -177,11 +177,6 @@ public sealed class NormalizationContext
         where T : class => GetCollection<T>(typeof(T).Name);
 
     /// <summary>
-    /// Gets all type keys that have collections.
-    /// </summary>
-    public IEnumerable<string> CollectionNames => _collections.Keys;
-
-    /// <summary>
     /// Checks if a source object has already been assigned an index via reference tracking.
     /// Used by generated code when UseReferenceTrackingForCycles is enabled.
     /// </summary>

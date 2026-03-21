@@ -19,7 +19,7 @@ public sealed class CircularReferenceTests
 
         var result = CycleConfig.Normalize(root);
         Assert.That(result, Is.Not.Null);
-        Assert.That(result.Root, Is.Not.Null);
+        Assert.That(result.TreeNodeList.Length, Is.GreaterThan(result.RootIndex));
     }
 
     [Test]
@@ -75,6 +75,7 @@ public sealed class CircularReferenceTests
 
         var result = CycleConfig.Normalize(person);
         Assert.That(result, Is.Not.Null);
+        Assert.That(result.CyclePersonList.Length, Is.GreaterThan(result.RootIndex));
     }
 
     [Test]
@@ -111,6 +112,7 @@ public sealed class CircularReferenceTests
 
         var result = CycleConfig.Normalize(a);
         Assert.That(result, Is.Not.Null);
+        Assert.That(result.NodeAList.Length, Is.GreaterThan(result.RootIndex));
     }
 
     [Test]
@@ -153,6 +155,7 @@ public sealed class CircularReferenceTests
 
         var result = CycleConfig.Normalize(org);
         Assert.That(result, Is.Not.Null);
+        Assert.That(result.OrgList.Length, Is.GreaterThan(result.RootIndex));
     }
 
     [Test]

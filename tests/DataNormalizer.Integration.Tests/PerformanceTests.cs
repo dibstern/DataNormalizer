@@ -61,7 +61,7 @@ public sealed class PerformanceTests
         {
             var result = DeepNestingConfig.Normalize(universes[i]);
             // Minimal assertion to prevent dead-code elimination
-            Assert.That(result.Root, Is.Not.Null);
+            Assert.That(result.UniverseList.Length, Is.GreaterThan(result.RootIndex));
         }
         sw.Stop();
 

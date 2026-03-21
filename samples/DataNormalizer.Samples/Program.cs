@@ -41,28 +41,31 @@ Console.WriteLine();
 
 var result = SampleNormalization.Normalize(order);
 
+var root = result.OrderList[result.RootIndex];
+
 Console.WriteLine("--- Normalized Structure ---");
-Console.WriteLine($"Root OrderId: {result.Root.OrderId}");
-Console.WriteLine($"Root CustomerIndex: {result.Root.CustomerIndex}");
-Console.WriteLine($"Root ShippingAddressIndex: {result.Root.ShippingAddressIndex}");
-Console.WriteLine($"Root OrderLine indices: [{string.Join(", ", result.Root.LinesIndices)}]");
+Console.WriteLine($"Root OrderId: {root.OrderId}");
+Console.WriteLine($"Root CustomerIndex: {root.CustomerIndex}");
+Console.WriteLine($"Root ShippingAddressIndex: {root.ShippingAddressIndex}");
+Console.WriteLine($"Root OrderLine indices: [{string.Join(", ", root.LinesIndices)}]");
 Console.WriteLine();
 
 Console.WriteLine("--- Collections ---");
-foreach (var name in result.CollectionNames)
-{
-    Console.WriteLine($"  {name}");
-}
+Console.WriteLine($"  OrderList: {result.OrderList.Length}");
+Console.WriteLine($"  CustomerList: {result.CustomerList.Length}");
+Console.WriteLine($"  AddressList: {result.AddressList.Length}");
+Console.WriteLine($"  OrderLineList: {result.OrderLineList.Length}");
+Console.WriteLine($"  ProductList: {result.ProductList.Length}");
 Console.WriteLine();
 
 // Demonstrate deduplication
-var addresses = result.GetCollection<NormalizedAddress>("Address");
-Console.WriteLine($"Addresses in collection: {addresses.Count}");
+var addresses = result.AddressList;
+Console.WriteLine($"Addresses in collection: {addresses.Length}");
 Console.WriteLine($"  (Billing and Shipping share the same address -> deduplicated to 1 entry)");
 Console.WriteLine();
 
-var products = result.GetCollection<NormalizedProduct>("Product");
-Console.WriteLine($"Products in collection: {products.Count}");
+var products = result.ProductList;
+Console.WriteLine($"Products in collection: {products.Length}");
 Console.WriteLine($"  Widget appears in 2 order lines but is stored once (dedup)");
 Console.WriteLine($"  Gadget is a separate product");
 foreach (var p in products)
@@ -214,22 +217,25 @@ Console.WriteLine();
 var corpResult = CorporateNormalization.Normalize(corp);
 
 Console.WriteLine("--- Collections ---");
-foreach (var name in corpResult.CollectionNames)
-{
-    Console.WriteLine($"  {name}");
-}
+Console.WriteLine($"  CorporationList: {corpResult.CorporationList.Length}");
+Console.WriteLine($"  DivisionList: {corpResult.DivisionList.Length}");
+Console.WriteLine($"  DepartmentList: {corpResult.DepartmentList.Length}");
+Console.WriteLine($"  TeamList: {corpResult.TeamList.Length}");
+Console.WriteLine($"  EmployeeList: {corpResult.EmployeeList.Length}");
+Console.WriteLine($"  CertificationList: {corpResult.CertificationList.Length}");
+Console.WriteLine($"  SkillList: {corpResult.SkillList.Length}");
 Console.WriteLine();
 
 // Show deduplication
 Console.WriteLine("--- Deduplication ---");
-var employees = corpResult.GetCollection<NormalizedEmployee>("Employee");
-Console.WriteLine($"  Employees: {employees.Count} (Alice appears once despite being in Alpha + Beta teams)");
-var certifications = corpResult.GetCollection<NormalizedCertification>("Certification");
+var employees = corpResult.EmployeeList;
+Console.WriteLine($"  Employees: {employees.Length} (Alice appears once despite being in Alpha + Beta teams)");
+var certifications = corpResult.CertificationList;
 Console.WriteLine(
-    $"  Certifications: {certifications.Count} (basicCert appears once despite Alice + Bob both having it)"
+    $"  Certifications: {certifications.Length} (basicCert appears once despite Alice + Bob both having it)"
 );
-var teams = corpResult.GetCollection<NormalizedTeam>("Team");
-Console.WriteLine($"  Teams: {teams.Count} (alphaTeam appears once despite Engineering + R&D sharing it)");
+var teams = corpResult.TeamList;
+Console.WriteLine($"  Teams: {teams.Length} (alphaTeam appears once despite Engineering + R&D sharing it)");
 Console.WriteLine();
 
 // === Denormalize and verify roundtrip ===

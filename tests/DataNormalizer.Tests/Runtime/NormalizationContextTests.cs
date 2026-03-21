@@ -96,15 +96,6 @@ public sealed class NormalizationContextTests
     }
 
     [Test]
-    public void CollectionNames_ReturnsAllKeys()
-    {
-        var ctx = new NormalizationContext();
-        ctx.AddToCollection("person", 0, new TestDto("Alice", 30));
-        ctx.AddToCollection("address", 0, new TestDto("Home", 1));
-        Assert.That(ctx.CollectionNames, Is.EquivalentTo(new[] { "person", "address" }));
-    }
-
-    [Test]
     public void AddToCollection_OverwriteAtExistingIndex_ReplacesValue()
     {
         var ctx = new NormalizationContext();
