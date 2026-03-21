@@ -34,7 +34,7 @@ internal static class NormalizerEmitter
                     sb.AppendLine();
                 }
 
-                EmitPublicNormalizeMethod(sb, rootType, rootNode, model, allNodes.Count);
+                EmitPublicNormalizeMethod(sb, rootType, rootNode, model, allNodes);
                 emittedRootCount++;
             }
         }
@@ -59,22 +59,34 @@ internal static class NormalizerEmitter
         RootTypeInfo rootType,
         TypeGraphNode rootNode,
         NormalizationModel model,
-        int typeCount
+        IReadOnlyList<TypeGraphNode> allNodes
     )
     {
-        var dtoFullName = GetDtoFullName(rootType.FullyQualifiedName, rootNode.TypeName);
-        var typeKey = GetTypeKey(rootNode, model);
+        var containerFullName = GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName);
 
-        sb.AppendLine(
-            $"    public static DataNormalizer.Runtime.NormalizedResult<{dtoFullName}> Normalize({rootType.FullyQualifiedName} source)"
-        );
+        sb.AppendLine($"    public static {containerFullName} Normalize({rootType.FullyQualifiedName} source)");
         sb.AppendLine("    {");
-        sb.AppendLine($"        var context = new DataNormalizer.Runtime.NormalizationContext({typeCount});");
+        sb.AppendLine($"        var context = new DataNormalizer.Runtime.NormalizationContext({allNodes.Count});");
         sb.AppendLine($"        var rootIndex = Normalize{rootNode.TypeName}(source, context);");
-        sb.AppendLine($"        var root = context.GetCollection<{dtoFullName}>(\"{typeKey}\")[rootIndex];");
-        sb.AppendLine(
-            $"        return new DataNormalizer.Runtime.NormalizedResult<{dtoFullName}>(root, rootIndex, context);"
-        );
+        sb.AppendLine($"        var result = new {containerFullName}();");
+        sb.AppendLine("        result.RootIndex = rootIndex;");
+
+        // Populate entity lists for each type in the graph
+        for (var i = 0; i < allNodes.Count; i++)
+        {
+            var node = allNodes[i];
+            var dtoFullName = GetDtoFullName(node.TypeFullName, node.TypeName);
+            var typeKey = GetTypeKey(node, model);
+            var camel = ToCamelCase(node.TypeName);
+
+            sb.AppendLine($"        var __{camel}Col = context.GetCollection<{dtoFullName}>(\"{typeKey}\");");
+            sb.AppendLine($"        var __{camel}Arr = new {dtoFullName}[__{camel}Col.Count];");
+            sb.AppendLine($"        for (var __i = 0; __i < __{camel}Col.Count; __i++)");
+            sb.AppendLine($"            __{camel}Arr[__i] = __{camel}Col[__i];");
+            sb.AppendLine($"        result.{node.TypeName}List = __{camel}Arr;");
+        }
+
+        sb.AppendLine("        return result;");
         sb.AppendLine("    }");
     }
 
@@ -474,6 +486,13 @@ internal static class NormalizerEmitter
         var ns = GetNamespace(typeFullName);
         var dtoName = $"Normalized{typeName}";
         return string.IsNullOrEmpty(ns) ? dtoName : $"{ns}.{dtoName}";
+    }
+
+    private static string GetContainerFullName(string typeFullName, string typeName)
+    {
+        var ns = GetNamespace(typeFullName);
+        var containerName = $"Normalized{typeName}Result";
+        return string.IsNullOrEmpty(ns) ? containerName : $"{ns}.{containerName}";
     }
 
     private static string GetNamespace(string typeFullName)
