@@ -16,7 +16,7 @@ public sealed class DenormalizerEmitterTests
         var result = DenormalizerEmitter.Emit(model, nodes);
 
         Assert.That(result, Does.Contain("public static TestApp.Person Denormalize("));
-        Assert.That(result, Does.Contain("DataNormalizer.Runtime.NormalizedResult<TestApp.NormalizedPerson>"));
+        Assert.That(result, Does.Contain("TestApp.NormalizedPersonResult normalized"));
     }
 
     [Test]
@@ -25,7 +25,7 @@ public sealed class DenormalizerEmitterTests
         var (model, nodes) = CreateSimplePersonScenario();
         var result = DenormalizerEmitter.Emit(model, nodes);
 
-        Assert.That(result, Does.Contain("var persons = new TestApp.Person[personDtos.Count]"));
+        Assert.That(result, Does.Contain("var persons = new TestApp.Person[personDtos.Length]"));
         Assert.That(result, Does.Contain("persons[i].Name = personDtos[i].Name;"));
         Assert.That(result, Does.Contain("persons[i].Age = personDtos[i].Age;"));
     }
@@ -108,8 +108,8 @@ public sealed class DenormalizerEmitterTests
         var (model, nodes) = CreateSimplePersonScenario();
         var result = DenormalizerEmitter.Emit(model, nodes);
 
-        // Should use result.RootIndex for direct index access (no reference equality)
-        Assert.That(result, Does.Contain("result.RootIndex"));
+        // Should use normalized.RootIndex for direct index access (no reference equality)
+        Assert.That(result, Does.Contain("normalized.RootIndex"));
         Assert.That(result, Does.Not.Contain("ReferenceEquals"));
     }
 
@@ -119,8 +119,8 @@ public sealed class DenormalizerEmitterTests
         var (model, nodes) = CreatePersonWithAddressScenario();
         var result = DenormalizerEmitter.Emit(model, nodes);
 
-        Assert.That(result, Does.Contain("result.GetCollection<TestApp.NormalizedPerson>(\"Person\")"));
-        Assert.That(result, Does.Contain("result.GetCollection<TestApp.NormalizedAddress>(\"Address\")"));
+        Assert.That(result, Does.Contain("normalized.PersonList"));
+        Assert.That(result, Does.Contain("normalized.AddressList"));
     }
 
     [Test]
@@ -152,14 +152,8 @@ public sealed class DenormalizerEmitterTests
 
         var result = DenormalizerEmitter.Emit(model, new[] { personNode, treeNode });
 
-        Assert.That(
-            result,
-            Does.Contain("Denormalize(DataNormalizer.Runtime.NormalizedResult<TestApp.NormalizedPerson>")
-        );
-        Assert.That(
-            result,
-            Does.Contain("Denormalize(DataNormalizer.Runtime.NormalizedResult<TestApp.NormalizedTreeNode>")
-        );
+        Assert.That(result, Does.Contain("Denormalize(TestApp.NormalizedPersonResult normalized)"));
+        Assert.That(result, Does.Contain("Denormalize(TestApp.NormalizedTreeNodeResult normalized)"));
     }
 
     [Test]
@@ -174,7 +168,7 @@ public sealed class DenormalizerEmitterTests
     }
 
     [Test]
-    public void Emit_WithCustomName_UsesCustomCollectionKey()
+    public void Emit_WithCustomName_UsesTypeNameForContainerProperty()
     {
         var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
 
@@ -198,7 +192,9 @@ public sealed class DenormalizerEmitterTests
 
         var result = DenormalizerEmitter.Emit(model, new[] { personNode });
 
-        Assert.That(result, Does.Contain("GetCollection<TestApp.NormalizedPerson>(\"People\")"));
+        // Container properties use TypeName, not custom name
+        Assert.That(result, Does.Contain("normalized.PersonList"));
+        Assert.That(result, Does.Not.Contain("GetCollection"));
     }
 
     // ---- Scenario Builders ----

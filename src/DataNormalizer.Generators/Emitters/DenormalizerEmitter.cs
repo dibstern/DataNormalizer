@@ -34,7 +34,7 @@ internal static class DenormalizerEmitter
                     sb.AppendLine();
                 }
 
-                EmitDenormalizeMethod(sb, rootType, rootNode, allNodes, model);
+                EmitDenormalizeMethod(sb, rootType, rootNode, allNodes);
                 emittedRootCount++;
             }
         }
@@ -47,18 +47,15 @@ internal static class DenormalizerEmitter
         StringBuilder sb,
         RootTypeInfo rootType,
         TypeGraphNode rootNode,
-        IReadOnlyList<TypeGraphNode> allNodes,
-        NormalizationModel model
+        IReadOnlyList<TypeGraphNode> allNodes
     )
     {
-        var rootDtoFullName = GetDtoFullName(rootType.FullyQualifiedName, rootNode.TypeName);
-        sb.AppendLine(
-            $"    public static {rootType.FullyQualifiedName} Denormalize(DataNormalizer.Runtime.NormalizedResult<{rootDtoFullName}> result)"
-        );
+        var containerFullName = GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName);
+        sb.AppendLine($"    public static {rootType.FullyQualifiedName} Denormalize({containerFullName} normalized)");
         sb.AppendLine("    {");
 
         // Collect all DTO collections
-        EmitGetCollections(sb, allNodes, model);
+        EmitGetCollections(sb, allNodes);
         sb.AppendLine();
 
         // Pass 1: Create all source objects, populate simple + inlined properties
@@ -75,19 +72,13 @@ internal static class DenormalizerEmitter
         sb.AppendLine("    }");
     }
 
-    private static void EmitGetCollections(
-        StringBuilder sb,
-        IReadOnlyList<TypeGraphNode> allNodes,
-        NormalizationModel model
-    )
+    private static void EmitGetCollections(StringBuilder sb, IReadOnlyList<TypeGraphNode> allNodes)
     {
         for (var i = 0; i < allNodes.Count; i++)
         {
             var node = allNodes[i];
             var camel = ToCamelCase(node.TypeName);
-            var typeKey = GetTypeKey(node, model);
-            var dtoFullName = GetDtoFullName(node.TypeFullName, node.TypeName);
-            sb.AppendLine($"        var {camel}Dtos = result.GetCollection<{dtoFullName}>(\"{typeKey}\");");
+            sb.AppendLine($"        var {camel}Dtos = normalized.{node.TypeName}List;");
         }
     }
 
@@ -104,8 +95,8 @@ internal static class DenormalizerEmitter
                 sb.AppendLine();
             }
 
-            sb.AppendLine($"        var {plural} = new {node.TypeFullName}[{camel}Dtos.Count];");
-            sb.AppendLine($"        for (var i = 0; i < {camel}Dtos.Count; i++)");
+            sb.AppendLine($"        var {plural} = new {node.TypeFullName}[{camel}Dtos.Length];");
+            sb.AppendLine($"        for (var i = 0; i < {camel}Dtos.Length; i++)");
             sb.AppendLine("        {");
             sb.AppendLine($"            {plural}[i] = new {node.TypeFullName}();");
 
@@ -144,7 +135,7 @@ internal static class DenormalizerEmitter
                 sb.AppendLine();
             }
 
-            sb.AppendLine($"        for (var i = 0; i < {camel}Dtos.Count; i++)");
+            sb.AppendLine($"        for (var i = 0; i < {camel}Dtos.Length; i++)");
             sb.AppendLine("        {");
 
             foreach (var prop in node.Properties)
@@ -335,7 +326,7 @@ internal static class DenormalizerEmitter
     {
         var plural = ToPlural(ToCamelCase(rootNode.TypeName));
 
-        sb.AppendLine($"        return {plural}[result.RootIndex];");
+        sb.AppendLine($"        return {plural}[normalized.RootIndex];");
     }
 
     private static bool HasReferenceProperties(TypeGraphNode node)
@@ -351,16 +342,6 @@ internal static class DenormalizerEmitter
         return false;
     }
 
-    private static string GetTypeKey(TypeGraphNode node, NormalizationModel model)
-    {
-        if (model.TypeConfigurations.TryGetValue(node.TypeFullName, out var config) && config.CustomName != null)
-        {
-            return config.CustomName;
-        }
-
-        return node.TypeName;
-    }
-
     private static TypeGraphNode? FindNode(IReadOnlyList<TypeGraphNode> allNodes, string typeFullName)
     {
         for (var i = 0; i < allNodes.Count; i++)
@@ -374,11 +355,11 @@ internal static class DenormalizerEmitter
         return null;
     }
 
-    private static string GetDtoFullName(string typeFullName, string typeName)
+    private static string GetContainerFullName(string typeFullName, string typeName)
     {
         var ns = GetNamespace(typeFullName);
-        var dtoName = $"Normalized{typeName}";
-        return string.IsNullOrEmpty(ns) ? dtoName : $"{ns}.{dtoName}";
+        var containerName = $"Normalized{typeName}Result";
+        return string.IsNullOrEmpty(ns) ? containerName : $"{ns}.{containerName}";
     }
 
     private static string GetNamespace(string typeFullName)
