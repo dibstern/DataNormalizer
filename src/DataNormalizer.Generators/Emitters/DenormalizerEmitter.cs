@@ -50,7 +50,7 @@ internal static class DenormalizerEmitter
         IReadOnlyList<TypeGraphNode> allNodes
     )
     {
-        var containerFullName = GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName);
+        var containerFullName = EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName);
         sb.AppendLine($"    public static {rootType.FullyQualifiedName} Denormalize({containerFullName} normalized)");
         sb.AppendLine("    {");
 
@@ -77,7 +77,7 @@ internal static class DenormalizerEmitter
         for (var i = 0; i < allNodes.Count; i++)
         {
             var node = allNodes[i];
-            var camel = ToCamelCase(node.TypeName);
+            var camel = EmitterHelpers.ToCamelCase(node.TypeName);
             sb.AppendLine($"        var {camel}Dtos = normalized.{node.TypeName}List;");
         }
     }
@@ -87,8 +87,8 @@ internal static class DenormalizerEmitter
         for (var nodeIdx = 0; nodeIdx < allNodes.Count; nodeIdx++)
         {
             var node = allNodes[nodeIdx];
-            var camel = ToCamelCase(node.TypeName);
-            var plural = ToPlural(camel);
+            var camel = EmitterHelpers.ToCamelCase(node.TypeName);
+            var plural = EmitterHelpers.ToPlural(camel);
 
             if (nodeIdx > 0)
             {
@@ -127,8 +127,8 @@ internal static class DenormalizerEmitter
                 continue;
             }
 
-            var camel = ToCamelCase(node.TypeName);
-            var plural = ToPlural(camel);
+            var camel = EmitterHelpers.ToCamelCase(node.TypeName);
+            var plural = EmitterHelpers.ToPlural(camel);
 
             if (emittedAny)
             {
@@ -164,12 +164,13 @@ internal static class DenormalizerEmitter
     )
     {
         var targetNode = EmitterHelpers.FindNode(allNodes, prop.TypeFullName);
-        var targetPlural = targetNode != null ? ToPlural(ToCamelCase(targetNode.TypeName)) : "unknown";
+        var targetPlural =
+            targetNode != null ? EmitterHelpers.ToPlural(EmitterHelpers.ToCamelCase(targetNode.TypeName)) : "unknown";
 
         if (prop.IsNullable)
         {
             sb.AppendLine(
-                $"            {plural}[i].{prop.Name} = {camel}Dtos[i].{prop.Name}Index is {{ }} {ToCamelCase(prop.Name)}Idx ? {targetPlural}[{ToCamelCase(prop.Name)}Idx] : null;"
+                $"            {plural}[i].{prop.Name} = {camel}Dtos[i].{prop.Name}Index is {{ }} {EmitterHelpers.ToCamelCase(prop.Name)}Idx ? {targetPlural}[{EmitterHelpers.ToCamelCase(prop.Name)}Idx] : null;"
             );
         }
         else
@@ -188,7 +189,8 @@ internal static class DenormalizerEmitter
     {
         var elementTypeFullName = prop.CollectionElementTypeFullName ?? prop.TypeFullName;
         var elementNode = EmitterHelpers.FindNode(allNodes, elementTypeFullName);
-        var elementPlural = elementNode != null ? ToPlural(ToCamelCase(elementNode.TypeName)) : "unknown";
+        var elementPlural =
+            elementNode != null ? EmitterHelpers.ToPlural(EmitterHelpers.ToCamelCase(elementNode.TypeName)) : "unknown";
 
         switch (prop.CollectionKind)
         {
@@ -324,7 +326,7 @@ internal static class DenormalizerEmitter
 
     private static void EmitRootResolution(StringBuilder sb, TypeGraphNode rootNode)
     {
-        var plural = ToPlural(ToCamelCase(rootNode.TypeName));
+        var plural = EmitterHelpers.ToPlural(EmitterHelpers.ToCamelCase(rootNode.TypeName));
 
         sb.AppendLine($"        return {plural}[normalized.RootIndex];");
     }
@@ -341,5 +343,4 @@ internal static class DenormalizerEmitter
 
         return false;
     }
-
 }
