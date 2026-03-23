@@ -9,25 +9,35 @@ A .NET source generator that normalizes nested object graphs into flat, deduplic
 
 ## What It Does
 
-Given a nested object graph with shared references:
+Given an object graph with shared references:
 
 ```csharp
 var sharedAddress = new Address { City = "Seattle", Zip = "98101" };
 
-var alice = new Person { Name = "Alice", Home = sharedAddress };
-var bob   = new Person { Name = "Bob",   Home = sharedAddress };
+var team = new Team
+{
+    Name = "Engineering",
+    Members = new[]
+    {
+        new Person { Name = "Alice", Home = sharedAddress },
+        new Person { Name = "Bob",   Home = sharedAddress },
+    },
+};
 ```
 
-One call normalizes the graph into a flat, deduplicated container:
+One call normalizes the entire graph into a flat, deduplicated container:
 
 ```csharp
-var result = AppNormalization.Normalize(alice);
+var result = AppNormalization.Normalize(team);
 var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
 ```
 
 ```json
 {
   "RootIndex": 0,
+  "TeamList": [
+    { "Name": "Engineering", "MembersIndices": [0, 1] }
+  ],
   "PersonList": [
     { "Name": "Alice", "HomeIndex": 0 },
     { "Name": "Bob",   "HomeIndex": 0 }
@@ -38,7 +48,7 @@ var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteInd
 }
 ```
 
-The shared `Address` is stored once. References become integer indices into typed arrays. The container serializes directly with `System.Text.Json` and is easy to reverse on any frontend.
+The shared `Address` is stored once. Nested objects become integer indices into typed arrays. The whole container serializes directly with `System.Text.Json` and is straightforward to reverse on any frontend.
 
 ## Installation
 
