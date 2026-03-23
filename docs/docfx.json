@@ -38,8 +38,8 @@
     "globalMetadata": {
       "_appTitle": "DataNormalizer",
       "_appFaviconPath": "images/favicon.png",
-      "_appLogoPath": "images/favicon.png",
-      "_appFooter": "DataNormalizer — MIT License",
+      "_appLogoPath": "images/logo.png",
+      "_appFooter": "DataNormalizer \u2014 MIT License",
       "_enableSearch": true,
       "_gitContribute": {
         "repo": "https://github.com/dibstern/DataNormalizer",
