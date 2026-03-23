@@ -26,7 +26,7 @@ internal static class NormalizerEmitter
         var emittedRootCount = 0;
         foreach (var rootType in model.RootTypes)
         {
-            var rootNode = FindNode(allNodes, rootType.FullyQualifiedName);
+            var rootNode = EmitterHelpers.FindNode(allNodes, rootType.FullyQualifiedName);
             if (rootNode != null)
             {
                 if (emittedRootCount > 0)
@@ -62,7 +62,7 @@ internal static class NormalizerEmitter
         IReadOnlyList<TypeGraphNode> allNodes
     )
     {
-        var containerFullName = GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName);
+        var containerFullName = EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName);
 
         sb.AppendLine($"    public static {containerFullName} Normalize({rootType.FullyQualifiedName} source)");
         sb.AppendLine("    {");
@@ -75,9 +75,9 @@ internal static class NormalizerEmitter
         for (var i = 0; i < allNodes.Count; i++)
         {
             var node = allNodes[i];
-            var dtoFullName = GetDtoFullName(node.TypeFullName, node.TypeName);
-            var typeKey = GetTypeKey(node, model);
-            var camel = ToCamelCase(node.TypeName);
+            var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName);
+            var typeKey = EmitterHelpers.GetTypeKey(node, model);
+            var camel = EmitterHelpers.ToCamelCase(node.TypeName);
 
             sb.AppendLine($"        var __{camel}Col = context.GetCollection<{dtoFullName}>(\"{typeKey}\");");
             sb.AppendLine($"        var __{camel}Arr = new {dtoFullName}[__{camel}Col.Count];");
@@ -93,8 +93,8 @@ internal static class NormalizerEmitter
     private static void EmitNormalizeHelper(StringBuilder sb, TypeGraphNode node, NormalizationModel model)
     {
         var typeName = node.TypeName;
-        var typeKey = GetTypeKey(node, model);
-        var dtoFullName = GetDtoFullName(node.TypeFullName, typeName);
+        var typeKey = EmitterHelpers.GetTypeKey(node, model);
+        var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, typeName);
 
         sb.AppendLine(
             $"    private static int Normalize{typeName}({node.TypeFullName} source, DataNormalizer.Runtime.NormalizationContext context)"
@@ -189,7 +189,9 @@ internal static class NormalizerEmitter
                     if (prop.IsCircularReference)
                     {
                         // Group B: use the real value from the local variable
-                        sb.AppendLine($"        fullDto.{indexPropName} = {ToCamelCase(prop.Name)}Index;");
+                        sb.AppendLine(
+                            $"        fullDto.{indexPropName} = {EmitterHelpers.ToCamelCase(prop.Name)}Index;"
+                        );
                     }
                     else
                     {
@@ -203,7 +205,9 @@ internal static class NormalizerEmitter
                     if (prop.IsCircularReference)
                     {
                         // Group B: use the real value from the local variable
-                        sb.AppendLine($"        fullDto.{indicesPropName} = {ToCamelCase(prop.Name)}Indices;");
+                        sb.AppendLine(
+                            $"        fullDto.{indicesPropName} = {EmitterHelpers.ToCamelCase(prop.Name)}Indices;"
+                        );
                     }
                     else
                     {
@@ -264,7 +268,7 @@ internal static class NormalizerEmitter
 
     private static void EmitNormalizedPropertyAssignment(StringBuilder sb, AnalyzedProperty prop)
     {
-        var nestedTypeName = GetShortTypeName(prop.TypeFullName);
+        var nestedTypeName = EmitterHelpers.GetShortTypeName(prop.TypeFullName);
         var indexPropName = $"{prop.Name}Index";
 
         if (prop.IsNullable)
@@ -283,8 +287,8 @@ internal static class NormalizerEmitter
     {
         var elementTypeName =
             prop.CollectionElementTypeFullName != null
-                ? GetShortTypeName(prop.CollectionElementTypeFullName)
-                : GetShortTypeName(prop.TypeFullName);
+                ? EmitterHelpers.GetShortTypeName(prop.CollectionElementTypeFullName)
+                : EmitterHelpers.GetShortTypeName(prop.TypeFullName);
         var indicesPropName = $"{prop.Name}Indices";
 
         EmitCollectionForLoop(
@@ -299,8 +303,8 @@ internal static class NormalizerEmitter
 
     private static void EmitComplexPropertyAssignment(StringBuilder sb, AnalyzedProperty prop)
     {
-        var nestedTypeName = GetShortTypeName(prop.TypeFullName);
-        var varName = $"{ToCamelCase(prop.Name)}Index";
+        var nestedTypeName = EmitterHelpers.GetShortTypeName(prop.TypeFullName);
+        var varName = $"{EmitterHelpers.ToCamelCase(prop.Name)}Index";
 
         if (prop.IsNullable)
         {
@@ -318,9 +322,9 @@ internal static class NormalizerEmitter
     {
         var elementTypeName =
             prop.CollectionElementTypeFullName != null
-                ? GetShortTypeName(prop.CollectionElementTypeFullName)
-                : GetShortTypeName(prop.TypeFullName);
-        var varName = $"{ToCamelCase(prop.Name)}Indices";
+                ? EmitterHelpers.GetShortTypeName(prop.CollectionElementTypeFullName)
+                : EmitterHelpers.GetShortTypeName(prop.TypeFullName);
+        var varName = $"{EmitterHelpers.ToCamelCase(prop.Name)}Indices";
 
         EmitCollectionForLoop(
             sb,
@@ -335,7 +339,7 @@ internal static class NormalizerEmitter
 
     private static void EmitKeyDtoNonCircularNormalizedProperty(StringBuilder sb, AnalyzedProperty prop)
     {
-        var nestedTypeName = GetShortTypeName(prop.TypeFullName);
+        var nestedTypeName = EmitterHelpers.GetShortTypeName(prop.TypeFullName);
         var indexPropName = $"{prop.Name}Index";
 
         if (prop.IsNullable)
@@ -354,8 +358,8 @@ internal static class NormalizerEmitter
     {
         var elementTypeName =
             prop.CollectionElementTypeFullName != null
-                ? GetShortTypeName(prop.CollectionElementTypeFullName)
-                : GetShortTypeName(prop.TypeFullName);
+                ? EmitterHelpers.GetShortTypeName(prop.CollectionElementTypeFullName)
+                : EmitterHelpers.GetShortTypeName(prop.TypeFullName);
         var indicesPropName = $"{prop.Name}Indices";
 
         EmitCollectionForLoop(
@@ -425,85 +429,5 @@ internal static class NormalizerEmitter
         }
 
         sb.AppendLine($"{indent}}}");
-    }
-
-    private static string ToCamelCase(string name)
-    {
-        if (string.IsNullOrEmpty(name))
-        {
-            return name;
-        }
-
-        var i = 0;
-        while (i < name.Length && char.IsUpper(name[i]))
-        {
-            i++;
-        }
-
-        if (i == 0)
-        {
-            return name;
-        }
-
-        if (i == 1)
-        {
-            return char.ToLowerInvariant(name[0]) + name.Substring(1);
-        }
-
-        if (i == name.Length)
-        {
-            return name.ToLowerInvariant();
-        }
-
-        return name.Substring(0, i - 1).ToLowerInvariant() + name.Substring(i - 1);
-    }
-
-    private static string GetTypeKey(TypeGraphNode node, NormalizationModel model)
-    {
-        if (model.TypeConfigurations.TryGetValue(node.TypeFullName, out var config) && config.CustomName != null)
-        {
-            return config.CustomName;
-        }
-
-        return node.TypeName;
-    }
-
-    private static TypeGraphNode? FindNode(IReadOnlyList<TypeGraphNode> allNodes, string typeFullName)
-    {
-        for (var i = 0; i < allNodes.Count; i++)
-        {
-            if (allNodes[i].TypeFullName == typeFullName)
-            {
-                return allNodes[i];
-            }
-        }
-
-        return null;
-    }
-
-    private static string GetDtoFullName(string typeFullName, string typeName)
-    {
-        var ns = GetNamespace(typeFullName);
-        var dtoName = $"Normalized{typeName}";
-        return string.IsNullOrEmpty(ns) ? dtoName : $"{ns}.{dtoName}";
-    }
-
-    private static string GetContainerFullName(string typeFullName, string typeName)
-    {
-        var ns = GetNamespace(typeFullName);
-        var containerName = $"Normalized{typeName}Result";
-        return string.IsNullOrEmpty(ns) ? containerName : $"{ns}.{containerName}";
-    }
-
-    private static string GetNamespace(string typeFullName)
-    {
-        var lastDot = typeFullName.LastIndexOf('.');
-        return lastDot > 0 ? typeFullName.Substring(0, lastDot) : "";
-    }
-
-    private static string GetShortTypeName(string typeFullName)
-    {
-        var lastDot = typeFullName.LastIndexOf('.');
-        return lastDot >= 0 ? typeFullName.Substring(lastDot + 1) : typeFullName;
     }
 }

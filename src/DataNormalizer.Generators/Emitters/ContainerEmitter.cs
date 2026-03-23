@@ -37,7 +37,7 @@ internal static class ContainerEmitter
         {
             var node = allNodes[i];
             var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName);
-            var listPropertyName = $"{node.TypeName}List";
+            var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes);
 
             EmitJsonNamingAttribute(sb, listPropertyName, jsonNamingPolicy);
             sb.AppendLine(

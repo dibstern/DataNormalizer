@@ -87,6 +87,32 @@ internal static class EmitterHelpers
         return node.TypeName;
     }
 
+    public static string GetListPropertyName(TypeGraphNode node, IReadOnlyList<TypeGraphNode> allNodes)
+    {
+        var count = 0;
+        for (var i = 0; i < allNodes.Count; i++)
+        {
+            if (allNodes[i].TypeName == node.TypeName)
+            {
+                count++;
+            }
+        }
+
+        if (count <= 1)
+        {
+            return $"{node.TypeName}List";
+        }
+
+        var ns = GetNamespace(node.TypeFullName);
+        if (string.IsNullOrEmpty(ns))
+        {
+            return $"{node.TypeName}List";
+        }
+
+        var prefix = ns.Replace(".", "");
+        return $"{prefix}{node.TypeName}List";
+    }
+
     public static string ToPlural(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -111,6 +137,13 @@ internal static class EmitterHelpers
         }
 
         return name + "s";
+    }
+
+    public static string GetContainerFullName(string typeFullName, string typeName)
+    {
+        var ns = GetNamespace(typeFullName);
+        var containerName = $"Normalized{typeName}Result";
+        return string.IsNullOrEmpty(ns) ? containerName : $"{ns}.{containerName}";
     }
 
     private static bool IsVowel(char c)

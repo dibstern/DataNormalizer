@@ -150,6 +150,57 @@ public sealed class ContainerEmitterTests
     }
 
     [Test]
+    public void Emit_DuplicateTypeNames_DisambiguatesWithNamespace()
+    {
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var acmeAddress = CreateNode("Acme.Address", "Address", SimpleProp("Street", "string", isRef: true));
+        var contosoAddress = CreateNode("Contoso.Address", "Address", SimpleProp("City", "string", isRef: true));
+        var allNodes = new List<TypeGraphNode> { personNode, acmeAddress, contosoAddress };
+
+        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+
+        // The two Address types must be disambiguated with namespace prefix
+        Assert.That(result, Does.Contain("AcmeAddressList"));
+        Assert.That(result, Does.Contain("ContosoAddressList"));
+        // The simple "AddressList" should NOT appear (both are disambiguated)
+        Assert.That(result, Does.Not.Contain("public Acme.NormalizedAddress[] AddressList"));
+        Assert.That(result, Does.Not.Contain("public Contoso.NormalizedAddress[] AddressList"));
+        // Person has no collision, so stays simple
+        Assert.That(result, Does.Contain("PersonList"));
+    }
+
+    [Test]
+    public void Emit_DuplicateTypeNames_CamelCase_DisambiguatesJsonPropertyNames()
+    {
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var acmeAddress = CreateNode("Acme.Address", "Address", SimpleProp("Street", "string", isRef: true));
+        var contosoAddress = CreateNode("Contoso.Address", "Address", SimpleProp("City", "string", isRef: true));
+        var allNodes = new List<TypeGraphNode> { personNode, acmeAddress, contosoAddress };
+
+        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: "CamelCase");
+
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"acmeAddressList\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"contosoAddressList\")]"));
+    }
+
+    [Test]
+    public void Emit_UniqueTypeNames_KeepsSimplePropertyNames()
+    {
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
+        var allNodes = new List<TypeGraphNode> { personNode, addressNode };
+
+        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+
+        // No collision, so simple names used
+        Assert.That(result, Does.Contain("PersonList"));
+        Assert.That(result, Does.Contain("AddressList"));
+        // No namespace-prefixed names
+        Assert.That(result, Does.Not.Contain("TestAppPersonList"));
+        Assert.That(result, Does.Not.Contain("TestAppAddressList"));
+    }
+
+    [Test]
     public void Emit_DoesNotEmitRootProperties_OnContainer()
     {
         var personNode = CreateNode(

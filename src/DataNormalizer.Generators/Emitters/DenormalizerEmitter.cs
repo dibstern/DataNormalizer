@@ -26,7 +26,7 @@ internal static class DenormalizerEmitter
         var emittedRootCount = 0;
         foreach (var rootType in model.RootTypes)
         {
-            var rootNode = FindNode(allNodes, rootType.FullyQualifiedName);
+            var rootNode = EmitterHelpers.FindNode(allNodes, rootType.FullyQualifiedName);
             if (rootNode != null)
             {
                 if (emittedRootCount > 0)
@@ -163,7 +163,7 @@ internal static class DenormalizerEmitter
         IReadOnlyList<TypeGraphNode> allNodes
     )
     {
-        var targetNode = FindNode(allNodes, prop.TypeFullName);
+        var targetNode = EmitterHelpers.FindNode(allNodes, prop.TypeFullName);
         var targetPlural = targetNode != null ? ToPlural(ToCamelCase(targetNode.TypeName)) : "unknown";
 
         if (prop.IsNullable)
@@ -187,7 +187,7 @@ internal static class DenormalizerEmitter
     )
     {
         var elementTypeFullName = prop.CollectionElementTypeFullName ?? prop.TypeFullName;
-        var elementNode = FindNode(allNodes, elementTypeFullName);
+        var elementNode = EmitterHelpers.FindNode(allNodes, elementTypeFullName);
         var elementPlural = elementNode != null ? ToPlural(ToCamelCase(elementNode.TypeName)) : "unknown";
 
         switch (prop.CollectionKind)
@@ -342,94 +342,4 @@ internal static class DenormalizerEmitter
         return false;
     }
 
-    private static TypeGraphNode? FindNode(IReadOnlyList<TypeGraphNode> allNodes, string typeFullName)
-    {
-        for (var i = 0; i < allNodes.Count; i++)
-        {
-            if (allNodes[i].TypeFullName == typeFullName)
-            {
-                return allNodes[i];
-            }
-        }
-
-        return null;
-    }
-
-    private static string GetContainerFullName(string typeFullName, string typeName)
-    {
-        var ns = GetNamespace(typeFullName);
-        var containerName = $"Normalized{typeName}Result";
-        return string.IsNullOrEmpty(ns) ? containerName : $"{ns}.{containerName}";
-    }
-
-    private static string GetNamespace(string typeFullName)
-    {
-        var lastDot = typeFullName.LastIndexOf('.');
-        return lastDot > 0 ? typeFullName.Substring(0, lastDot) : "";
-    }
-
-    private static string ToCamelCase(string name)
-    {
-        if (string.IsNullOrEmpty(name))
-        {
-            return name;
-        }
-
-        // Find the end of the uppercase prefix
-        // "Person" → "person", "PhoneNumber" → "phoneNumber", "ID" → "id"
-        var i = 0;
-        while (i < name.Length && char.IsUpper(name[i]))
-        {
-            i++;
-        }
-
-        if (i == 0)
-        {
-            return name;
-        }
-
-        if (i == 1)
-        {
-            return char.ToLowerInvariant(name[0]) + name.Substring(1);
-        }
-
-        // Multiple uppercase: lowercase all but the last one (unless the whole string is uppercase)
-        if (i == name.Length)
-        {
-            return name.ToLowerInvariant();
-        }
-
-        return name.Substring(0, i - 1).ToLowerInvariant() + name.Substring(i - 1);
-    }
-
-    private static string ToPlural(string name)
-    {
-        if (string.IsNullOrEmpty(name))
-        {
-            return name;
-        }
-
-        if (
-            name.EndsWith("s")
-            || name.EndsWith("x")
-            || name.EndsWith("z")
-            || name.EndsWith("sh")
-            || name.EndsWith("ch")
-        )
-        {
-            return name + "es";
-        }
-
-        if (name.EndsWith("y") && name.Length > 1 && !IsVowel(name[name.Length - 2]))
-        {
-            return name.Substring(0, name.Length - 1) + "ies";
-        }
-
-        return name + "s";
-    }
-
-    private static bool IsVowel(char c)
-    {
-        return "aeiouAEIOU".IndexOf(c) >= 0;
-    }
 }
