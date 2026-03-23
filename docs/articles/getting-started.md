@@ -81,8 +81,7 @@ The `Normalize` method returns a container DTO (`Normalized{RootType}Result`) wi
 ```csharp
 var result = AppNormalization.Normalize(person);
 
-result.RootIndex                         // Index into the root type's entity list
-result.PersonList[result.RootIndex]      // The root DTO (resolve via index)
+result.PersonList[0]                     // The root DTO (always at index 0)
 
 result.PersonList                        // NormalizedPerson[] (typed array)
 result.AddressList                       // NormalizedAddress[] (typed array)

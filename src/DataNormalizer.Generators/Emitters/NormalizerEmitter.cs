@@ -77,9 +77,8 @@ internal static class NormalizerEmitter
         sb.AppendLine($"    public static {containerFullName} Normalize({rootType.FullyQualifiedName} source)");
         sb.AppendLine("    {");
         sb.AppendLine($"        var context = new DataNormalizer.Runtime.NormalizationContext({allNodes.Count});");
-        sb.AppendLine($"        var rootIndex = Normalize{rootNode.TypeName}(source, context);");
+        sb.AppendLine($"        Normalize{rootNode.TypeName}(source, context);");
         sb.AppendLine($"        var result = new {containerFullName}();");
-        sb.AppendLine("        result.RootIndex = rootIndex;");
 
         // Populate entity lists for each type in the graph
         for (var i = 0; i < allNodes.Count; i++)

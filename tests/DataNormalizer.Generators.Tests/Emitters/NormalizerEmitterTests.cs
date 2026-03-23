@@ -31,7 +31,7 @@ public sealed class NormalizerEmitterTests
             Does.Contain("public static TestApp.NormalizedPersonResult Normalize(TestApp.Person source)")
         );
         // Populates entity lists on container
-        Assert.That(result, Does.Contain("result.RootIndex = rootIndex;"));
+        Assert.That(result, Does.Not.Contain("RootIndex"));
         Assert.That(result, Does.Contain("result.PersonList = "));
         Assert.That(result, Does.Contain("return result;"));
         // Helper method
@@ -375,10 +375,10 @@ public sealed class NormalizerEmitterTests
             Does.Contain("public static TestApp.NormalizedOrderResult Normalize(TestApp.Order source)")
         );
         Assert.That(result, Does.Contain("var context = new DataNormalizer.Runtime.NormalizationContext(1);"));
-        Assert.That(result, Does.Contain("var rootIndex = NormalizeOrder(source, context);"));
+        Assert.That(result, Does.Contain("NormalizeOrder(source, context);"));
         // Creates container and populates it
         Assert.That(result, Does.Contain("var result = new TestApp.NormalizedOrderResult();"));
-        Assert.That(result, Does.Contain("result.RootIndex = rootIndex;"));
+        Assert.That(result, Does.Not.Contain("RootIndex"));
         // Entity list population
         Assert.That(result, Does.Contain("context.GetCollection<TestApp.NormalizedOrder>(\"Order\")"));
         Assert.That(result, Does.Contain("result.OrderList = "));

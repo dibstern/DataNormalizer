@@ -338,7 +338,7 @@ internal static class DenormalizerEmitter
     {
         var plural = EmitterHelpers.ToPlural(EmitterHelpers.ToCamelCase(rootNode.TypeName));
 
-        sb.AppendLine($"        return {plural}[normalized.RootIndex];");
+        sb.AppendLine($"        return {plural}[0];");
     }
 
     private static bool HasReferenceProperties(TypeGraphNode node)

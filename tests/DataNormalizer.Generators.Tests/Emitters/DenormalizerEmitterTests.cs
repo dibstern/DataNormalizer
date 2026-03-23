@@ -103,13 +103,14 @@ public sealed class DenormalizerEmitterTests
     }
 
     [Test]
-    public void Emit_RootResolution_UsesRootIndex()
+    public void Emit_RootResolution_UsesIndexZero()
     {
         var (model, nodes) = CreateSimplePersonScenario();
         var result = DenormalizerEmitter.Emit(model, nodes);
 
-        // Should use normalized.RootIndex for direct index access (no reference equality)
-        Assert.That(result, Does.Contain("normalized.RootIndex"));
+        // Root is always at index 0 — no RootIndex property needed
+        Assert.That(result, Does.Contain("persons[0]"));
+        Assert.That(result, Does.Not.Contain("RootIndex"));
         Assert.That(result, Does.Not.Contain("ReferenceEquals"));
     }
 

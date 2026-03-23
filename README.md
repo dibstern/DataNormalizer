@@ -34,7 +34,6 @@ var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteInd
 
 ```json
 {
-  "RootIndex": 0,
   "TeamList": [
     { "Name": "Engineering", "MembersIndices": [0, 1] }
   ],
@@ -98,8 +97,8 @@ public partial class AppNormalization : NormalizationConfig
 // Normalize
 var result = AppNormalization.Normalize(person);
 
-// Access the root entity via RootIndex
-var root = result.PersonList[result.RootIndex];
+// Access the root entity (always at index 0)
+var root = result.PersonList[0];
 Console.WriteLine(root.Name);           // "Alice"
 Console.WriteLine(root.HomeIndex);      // 0
 
@@ -122,7 +121,7 @@ For each `NormalizeGraph<T>()` call, the generator produces:
 
 1. **Per-type DTOs** (`Normalized{TypeName}`) — partial classes implementing `IEquatable<T>` for value-based deduplication. Nested object references become `int` indices (`{Name}Index`), collections become `int[]` (`{Name}Indices`).
 
-2. **A container result** (`Normalized{TypeName}Result`) — holds `RootIndex` and a `{TypeName}List` array for every entity type in the graph. This is the primary output of `Normalize()` and the input to `Denormalize()`.
+2. **A container result** (`Normalized{TypeName}Result`) — holds a `{TypeName}List` array for every entity type in the graph. The root entity is always at index 0 in the root type's list. This is the primary output of `Normalize()` and the input to `Denormalize()`.
 
 3. **`Normalize(T)` / `Denormalize(Normalized{T}Result)`** — static methods on the configuration class.
 
@@ -223,7 +222,7 @@ Any consumer (frontend, API client, other language) can reconstruct the original
 1. Parse JSON into the container shape
 2. Reconstruct leaf entities from their lists
 3. Reconstruct composite entities by resolving index references into entity lists
-4. Resolve the root entity via `RootIndex` into its entity list
+4. The root entity is always at index 0 in the root type's list
 
 Shared references are preserved: multiple indices pointing to the same list entry reconstruct as the same object reference.
 

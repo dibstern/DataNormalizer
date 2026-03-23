@@ -282,7 +282,7 @@ public void Normalize_SharedAddress_DeduplicatesToOneEntry()
 
     // Assert
     Assert.That(result.AddressList, Has.Length.EqualTo(1));
-    var root = result.PersonList[result.RootIndex];
+    var root = result.PersonList[0];
     Assert.That(root.HomeAddressIndex, Is.EqualTo(root.WorkAddressIndex));
 }
 ```

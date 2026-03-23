@@ -8,11 +8,11 @@ The original `data-normalization` project output a flat `Dictionary<string, List
 
 ## Design
 
-### Container = Separate Result Type with RootIndex
+### Container = Separate Result Type
 
 The container is a **separate class** from per-type DTOs. It holds:
-- `RootIndex` — index into the root type's entity list
 - `{TypeName}List` array properties for ALL types in the graph (including root)
+- The root entity is always at index 0 in the root type's list
 
 Per-type DTOs are generated for ALL types (including root) as before with `IEquatable<T>`.
 
@@ -48,7 +48,6 @@ Generated container:
 ```csharp
 public partial class NormalizedPersonResult
 {
-    public int RootIndex { get; set; }
     public NormalizedPerson[] PersonList { get; set; } = Array.Empty<NormalizedPerson>();
     public NormalizedAddress[] AddressList { get; set; } = Array.Empty<NormalizedAddress>();
 }
@@ -57,7 +56,6 @@ public partial class NormalizedPersonResult
 Serialized JSON:
 ```json
 {
-  "RootIndex": 0,
   "PersonList": [
     { "Name": "Alice", "HomeIndex": 0 },
     { "Name": "Bob", "HomeIndex": 0 }
@@ -80,9 +78,8 @@ Serialized JSON:
 public static NormalizedPersonResult Normalize(Person source)
 {
     var context = new NormalizationContext(typeCount);
-    var rootIndex = NormalizePerson(source, context);
+    NormalizePerson(source, context);
     var result = new NormalizedPersonResult();
-    result.RootIndex = rootIndex;
     // Populate entity lists from context
     result.PersonList = CopyCollection<NormalizedPerson>(context, "Person");
     result.AddressList = CopyCollection<NormalizedAddress>(context, "Address");
@@ -117,8 +114,8 @@ public static Person Denormalize(NormalizedPersonResult normalized)
     for (var i = 0; i < normalized.PersonList.Length; i++)
         persons[i].Home = addresses[normalized.PersonList[i].HomeIndex];
 
-    // Resolve root by index
-    return persons[normalized.RootIndex];
+    // Root is always at index 0
+    return persons[0];
 }
 ```
 
@@ -145,7 +142,7 @@ Any consumer can reconstruct the original object graph:
 1. Parse JSON into container shape
 2. Reconstruct leaf entities from their lists
 3. Reconstruct composite entities by resolving index references into entity lists
-4. Resolve root entity via `RootIndex` into root type's entity list
+4. The root entity is always at index 0 in the root type's list
 
 Shared references are preserved: multiple indices pointing to the same list entry reconstruct as the same object reference.
 

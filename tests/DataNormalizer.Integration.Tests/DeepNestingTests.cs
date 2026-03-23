@@ -12,7 +12,7 @@ public sealed class DeepNestingTests
         var universe = CreateDeepUniverse();
 
         var result = DeepNestingConfig.Normalize(universe);
-        var root = result.UniverseList[result.RootIndex];
+        var root = result.UniverseList[0];
 
         Assert.That(root, Is.Not.Null);
         Assert.That(root.Name, Is.EqualTo("Observable Universe"));

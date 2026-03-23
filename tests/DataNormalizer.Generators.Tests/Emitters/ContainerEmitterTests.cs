@@ -10,7 +10,7 @@ namespace DataNormalizer.Generators.Tests.Emitters;
 public sealed class ContainerEmitterTests
 {
     [Test]
-    public void Emit_SimpleGraph_GeneratesContainerWithRootIndexAndEntityLists()
+    public void Emit_SimpleGraph_GeneratesContainerWithEntityLists()
     {
         var personNode = CreateNode(
             "TestApp.Person",
@@ -24,7 +24,7 @@ public sealed class ContainerEmitterTests
         var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
 
         Assert.That(result, Does.Contain("public partial class NormalizedPersonResult"));
-        Assert.That(result, Does.Contain("public int RootIndex { get; set; }"));
+        Assert.That(result, Does.Not.Contain("RootIndex"));
         Assert.That(
             result,
             Does.Contain(
@@ -48,7 +48,7 @@ public sealed class ContainerEmitterTests
 
         var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: "CamelCase");
 
-        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"rootIndex\")]"));
+        Assert.That(result, Does.Not.Contain("rootIndex"));
         Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"personList\")]"));
         Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"addressList\")]"));
     }

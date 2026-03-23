@@ -41,7 +41,7 @@ Console.WriteLine();
 
 var result = SampleNormalization.Normalize(order);
 
-var root = result.OrderList[result.RootIndex];
+var root = result.OrderList[0];
 
 Console.WriteLine("--- Normalized Structure ---");
 Console.WriteLine($"Root OrderId: {root.OrderId}");
@@ -74,7 +74,6 @@ foreach (var p in products)
 }
 Console.WriteLine();
 
-Console.WriteLine($"RootIndex: {result.RootIndex}");
 Console.WriteLine();
 
 // === Denormalize ===

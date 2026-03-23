@@ -28,10 +28,6 @@ internal static class ContainerEmitter
         sb.AppendLine($"public partial class {containerName}");
         sb.AppendLine("{");
 
-        // RootIndex property
-        EmitJsonNamingAttribute(sb, "RootIndex", jsonNamingPolicy);
-        sb.AppendLine("    public int RootIndex { get; set; }");
-
         // Entity list properties for all types in the graph
         for (var i = 0; i < allNodes.Count; i++)
         {
