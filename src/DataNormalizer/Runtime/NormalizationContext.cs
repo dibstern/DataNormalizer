@@ -2,7 +2,9 @@ namespace DataNormalizer.Runtime;
 
 /// <summary>
 /// Tracks normalization state including deduplication indices and flat collections.
-/// Used by generated normalizer code.
+/// This is an implementation detail used internally by generated normalizer code.
+/// Application code should not interact with this type directly — use the generated
+/// <c>Normalized{TypeName}Result</c> container instead.
 /// </summary>
 public sealed class NormalizationContext
 {
