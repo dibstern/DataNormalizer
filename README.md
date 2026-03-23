@@ -18,7 +18,12 @@ var alice = new Person { Name = "Alice", Home = sharedAddress };
 var bob   = new Person { Name = "Bob",   Home = sharedAddress };
 ```
 
-DataNormalizer produces a single, self-contained container with flat, deduplicated arrays:
+One call normalizes the graph into a flat, deduplicated container:
+
+```csharp
+var result = AppNormalization.Normalize(alice);
+var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+```
 
 ```json
 {
