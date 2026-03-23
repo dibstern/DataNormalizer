@@ -40,8 +40,14 @@ jobs:
       - name: Pack
         run: dotnet pack src/DataNormalizer/DataNormalizer.csproj -c Release --no-build /p:Version=${{ steps.version.outputs.VERSION }} -o ./nupkgs
 
+      - name: NuGet login (OIDC trusted publishing)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: dibstern
+
       - name: Push to NuGet
-        run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
