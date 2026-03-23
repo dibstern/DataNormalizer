@@ -37,6 +37,8 @@
     "template": ["default", "modern"],
     "globalMetadata": {
       "_appTitle": "DataNormalizer",
+      "_appFaviconPath": "images/favicon.png",
+      "_appLogoPath": "images/favicon.png",
       "_appFooter": "DataNormalizer — MIT License",
       "_enableSearch": true,
       "_gitContribute": {
