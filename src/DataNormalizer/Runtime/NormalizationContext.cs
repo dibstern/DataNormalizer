@@ -140,7 +140,12 @@ public sealed class NormalizationContext
     /// <param name="obj">The object to store.</param>
     public void AddToCollection(string typeKey, int index, object obj)
     {
+#if NET8_0_OR_GREATER
         ArgumentOutOfRangeException.ThrowIfNegative(index);
+#else
+        if (index < 0)
+            throw new ArgumentOutOfRangeException(nameof(index), index, "Index must be non-negative.");
+#endif
 
         if (!_collections.TryGetValue(typeKey, out var list))
         {

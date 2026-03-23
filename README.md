@@ -1,6 +1,6 @@
 # DataNormalizer
 
-A .NET source generator that normalizes nested object graphs into flat, deduplicated representations.
+A .NET source generator that normalizes nested object graphs into flat, deduplicated, JSON-serializable containers.
 
 [![NuGet](https://img.shields.io/nuget/v/DataNormalizer.svg)](https://www.nuget.org/packages/DataNormalizer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -9,34 +9,39 @@ A .NET source generator that normalizes nested object graphs into flat, deduplic
 
 ## What It Does
 
-**Before** — nested objects with shared references:
+Given a nested object graph with shared references:
 
 ```csharp
 var sharedAddress = new Address { City = "Seattle", Zip = "98101" };
 
-var people = new[]
+var alice = new Person { Name = "Alice", Home = sharedAddress };
+var bob   = new Person { Name = "Bob",   Home = sharedAddress };
+```
+
+DataNormalizer produces a single, self-contained container with flat, deduplicated arrays:
+
+```json
 {
-    new Person { Name = "Alice", Home = sharedAddress },
-    new Person { Name = "Bob",   Home = sharedAddress },
-};
+  "RootIndex": 0,
+  "PersonList": [
+    { "Name": "Alice", "HomeIndex": 0 },
+    { "Name": "Bob",   "HomeIndex": 0 }
+  ],
+  "AddressList": [
+    { "City": "Seattle", "Zip": "98101" }
+  ]
+}
 ```
 
-**After** — flat, deduplicated DTOs with integer index references:
-
-```csharp
-// NormalizedPerson { Name = "Alice", HomeIndex = 0 }
-// NormalizedPerson { Name = "Bob",   HomeIndex = 0 }  ← same index, deduplicated
-//
-// Address collection: [ NormalizedAddress { City = "Seattle", Zip = "98101" } ]
-```
-
-Shared `Address` instances are stored once. References become integer indices into flat collections.
+The shared `Address` is stored once. References become integer indices into typed arrays. The container serializes directly with `System.Text.Json` and is easy to reverse on any frontend.
 
 ## Installation
 
 ```
 dotnet add package DataNormalizer
 ```
+
+Supports **.NET 6**, **.NET 7**, **.NET 8**, **.NET 9**, and **.NET 10**.
 
 ## Quick Start
 
@@ -72,18 +77,50 @@ public partial class AppNormalization : NormalizationConfig
 }
 ```
 
-### 3. Normalize and denormalize
+### 3. Normalize, use, and denormalize
 
 ```csharp
+// Normalize
 var result = AppNormalization.Normalize(person);
+
+// Access the root entity via RootIndex
+var root = result.PersonList[result.RootIndex];
+Console.WriteLine(root.Name);           // "Alice"
+Console.WriteLine(root.HomeIndex);      // 0
+
+// Access entity lists directly
+Console.WriteLine(result.PersonList.Length);   // 2
+Console.WriteLine(result.AddressList.Length);  // 1 (deduplicated)
+
+// Serialize the entire container to JSON
+var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+
+// Denormalize back to the original object graph
 var restored = AppNormalization.Denormalize(result);
 ```
 
-The source generator produces the `Normalize` and `Denormalize` static methods at compile time.
+The source generator produces `Normalize` and `Denormalize` static methods, per-type DTOs, and the container result class at compile time.
+
+## How It Works
+
+For each `NormalizeGraph<T>()` call, the generator produces:
+
+1. **Per-type DTOs** (`Normalized{TypeName}`) — partial classes implementing `IEquatable<T>` for value-based deduplication. Nested object references become `int` indices (`{Name}Index`), collections become `int[]` (`{Name}Indices`).
+
+2. **A container result** (`Normalized{TypeName}Result`) — holds `RootIndex` and a `{TypeName}List` array for every entity type in the graph. This is the primary output of `Normalize()` and the input to `Denormalize()`.
+
+3. **`Normalize(T)` / `Denormalize(Normalized{T}Result)`** — static methods on the configuration class.
+
+All generated types are `partial`, so you can extend them with additional members.
 
 ## Target Frameworks
 
-The runtime library targets `net8.0`, `net9.0`, and `net10.0`. The source generator targets `netstandard2.0` (a Roslyn requirement) and is bundled in the same NuGet package.
+| Component | Targets |
+|---|---|
+| Runtime library | `net6.0`, `net7.0`, `net8.0`, `net9.0`, `net10.0` |
+| Source generator | `netstandard2.0` (Roslyn requirement, bundled in NuGet package) |
+
+The generator runs at compile time regardless of your target framework. The runtime library provides the `NormalizationContext` used internally by generated code.
 
 ## Configuration Options
 
@@ -152,41 +189,28 @@ public class Person
 
 ### Multiple root types
 
-Register multiple roots to generate overloaded `Normalize()`/`Denormalize()` methods:
+Register multiple roots to generate separate container types and `Normalize()`/`Denormalize()` overloads:
 
 ```csharp
 protected override void Configure(NormalizeBuilder builder)
 {
-    builder.NormalizeGraph<Person>();
-    builder.NormalizeGraph<Order>();
+    builder.NormalizeGraph<Person>();  // → NormalizedPersonResult
+    builder.NormalizeGraph<Order>();   // → NormalizedOrderResult
 }
 ```
 
-## Generated Code
+Each container includes only the entity lists reachable from its root type.
 
-The source generator produces:
+## Reversing Normalized Data
 
-- **`Normalized{TypeName}`** — partial classes implementing `IEquatable<T>` for value-based deduplication.
-- **`{Name}Index`** (`int`) — replaces normalized nested object references.
-- **`{Name}Indices`** (`int[]`) — replaces normalized collection references.
-- **Inlined properties** keep their original type.
-- All generated DTOs are `partial`, so you can extend them with additional members.
+Any consumer (frontend, API client, other language) can reconstruct the original object graph from the serialized container:
 
-## Container Result API
+1. Parse JSON into the container shape
+2. Reconstruct leaf entities from their lists
+3. Reconstruct composite entities by resolving index references into entity lists
+4. Resolve the root entity via `RootIndex` into its entity list
 
-Each `NormalizeGraph<T>()` produces a container DTO named `Normalized{RootType}Result` with typed arrays for every entity type in the graph:
-
-```csharp
-var result = AppNormalization.Normalize(person);
-
-result.RootIndex                         // Index into the root type's entity list
-result.PersonList[result.RootIndex]      // The root DTO (resolve via index)
-
-result.PersonList                        // NormalizedPerson[] (typed array)
-result.AddressList                       // NormalizedAddress[] (typed array)
-// All collections are typed properties — no string-keyed lookups.
-// The container serializes directly with System.Text.Json.
-```
+Shared references are preserved: multiple indices pointing to the same list entry reconstruct as the same object reference.
 
 ## Circular References
 

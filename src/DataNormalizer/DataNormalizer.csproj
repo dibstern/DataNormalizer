@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;net7.0;net8.0;net9.0;net10.0</TargetFrameworks>
     <VersionPrefix>0.0.1</VersionPrefix>
     <PackageId>DataNormalizer</PackageId>
     <Description>Source generator that normalizes nested object graphs into flat, deduplicated representations.</Description>
