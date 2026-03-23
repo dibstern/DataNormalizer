@@ -15,6 +15,12 @@ The NuGet package includes both the runtime library and the source generator. No
 Start with plain C# classes that form an object graph:
 
 ```csharp
+public class Team
+{
+    public string Name { get; set; }
+    public Person[] Members { get; set; }
+}
+
 public class Person
 {
     public string Name { get; set; }
@@ -41,22 +47,30 @@ public partial class AppNormalization : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
-        builder.NormalizeGraph<Person>();
+        builder.NormalizeGraph<Team>();  // discovers Person, Address
     }
 }
 ```
 
-`NormalizeGraph<Person>()` tells the source generator to walk the type graph starting from `Person` and discover all referenced complex types (`Address`, etc.) automatically.
+`NormalizeGraph<Team>()` tells the source generator to walk the type graph starting from `Team` and discover all referenced complex types (`Person`, `Address`, etc.) automatically.
 
 ## 3. Normalize and denormalize
 
 ```csharp
 var sharedAddress = new Address { City = "Seattle", Zip = "98101" };
 
-var person = new Person { Name = "Alice", Home = sharedAddress };
+var team = new Team
+{
+    Name = "Engineering",
+    Members = new[]
+    {
+        new Person { Name = "Alice", Home = sharedAddress },
+        new Person { Name = "Bob",   Home = sharedAddress },
+    },
+};
 
 // Normalize: nested graph → flat, deduplicated DTOs
-var result = AppNormalization.Normalize(person);
+var result = AppNormalization.Normalize(team);
 
 // Denormalize: flat DTOs → restored nested graph
 var restored = AppNormalization.Denormalize(result);
@@ -79,10 +93,11 @@ For each type in the graph, the generator creates:
 The `Normalize` method returns a container DTO (`Normalized{RootType}Result`) with typed arrays for every entity type in the graph:
 
 ```csharp
-var result = AppNormalization.Normalize(person);
+var result = AppNormalization.Normalize(team);
 
-result.PersonList[0]                     // The root DTO (always at index 0)
+result.TeamList[0]                       // The root DTO (always at index 0)
 
+result.TeamList                          // NormalizedTeam[] (typed array)
 result.PersonList                        // NormalizedPerson[] (typed array)
 result.AddressList                       // NormalizedAddress[] (typed array)
 // All collections are typed properties — no string-keyed lookups.

@@ -62,6 +62,12 @@ Supports **.NET 6**, **.NET 7**, **.NET 8**, **.NET 9**, and **.NET 10**.
 ### 1. Define your domain types
 
 ```csharp
+public class Team
+{
+    public string Name { get; set; }
+    public Person[] Members { get; set; }
+}
+
 public class Person
 {
     public string Name { get; set; }
@@ -86,7 +92,7 @@ public partial class AppNormalization : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
-        builder.NormalizeGraph<Person>();
+        builder.NormalizeGraph<Team>();  // discovers Person, Address
     }
 }
 ```
@@ -95,12 +101,12 @@ public partial class AppNormalization : NormalizationConfig
 
 ```csharp
 // Normalize
-var result = AppNormalization.Normalize(person);
+var result = AppNormalization.Normalize(team);
 
 // Access the root entity (always at index 0)
-var root = result.PersonList[0];
-Console.WriteLine(root.Name);           // "Alice"
-Console.WriteLine(root.HomeIndex);      // 0
+var root = result.TeamList[0];
+Console.WriteLine(root.Name);             // "Engineering"
+Console.WriteLine(root.MembersIndices);   // [0, 1]
 
 // Access entity lists directly
 Console.WriteLine(result.PersonList.Length);   // 2
@@ -143,7 +149,7 @@ The generator runs at compile time regardless of your target framework. The runt
 `NormalizeGraph<T>()` walks the type graph starting from `T` and discovers all referenced complex types automatically.
 
 ```csharp
-builder.NormalizeGraph<Person>(); // discovers Address, etc.
+builder.NormalizeGraph<Team>();  // discovers Person, Address, etc.
 ```
 
 ### Opt-out (Inline)
@@ -208,8 +214,8 @@ Register multiple roots to generate separate container types and `Normalize()`/`
 ```csharp
 protected override void Configure(NormalizeBuilder builder)
 {
-    builder.NormalizeGraph<Person>();  // → NormalizedPersonResult
-    builder.NormalizeGraph<Order>();   // → NormalizedOrderResult
+    builder.NormalizeGraph<Team>();   // → NormalizedTeamResult
+    builder.NormalizeGraph<Order>();  // → NormalizedOrderResult
 }
 ```
 

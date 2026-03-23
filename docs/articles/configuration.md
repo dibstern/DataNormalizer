@@ -7,10 +7,10 @@ DataNormalizer uses a fluent API and attributes to control how your object graph
 `NormalizeGraph<T>()` walks the type graph starting from `T` and discovers all referenced complex types automatically:
 
 ```csharp
-builder.NormalizeGraph<Person>(); // discovers Address, etc.
+builder.NormalizeGraph<Team>();  // discovers Person, Address, etc.
 ```
 
-Any complex type reachable from `Person` is automatically included in the normalization graph and gets its own flat collection.
+Any complex type reachable from `Team` is automatically included in the normalization graph and gets its own flat collection.
 
 ## Opt-out (Inline)
 
@@ -84,8 +84,8 @@ Register multiple roots to generate overloaded `Normalize()`/`Denormalize()` met
 ```csharp
 protected override void Configure(NormalizeBuilder builder)
 {
-    builder.NormalizeGraph<Person>();
-    builder.NormalizeGraph<Order>();
+    builder.NormalizeGraph<Team>();   // → NormalizedTeamResult
+    builder.NormalizeGraph<Order>();  // → NormalizedOrderResult
 }
 ```
 
@@ -96,10 +96,11 @@ Each root type gets its own `Normalize` and `Denormalize` overload on the config
 Each `NormalizeGraph<T>()` produces a container DTO (`Normalized{RootType}Result`) that provides access to the flat, deduplicated collections as typed arrays:
 
 ```csharp
-var result = AppNormalization.Normalize(person);
+var result = AppNormalization.Normalize(team);
 
-result.PersonList[0]                     // The root DTO (always at index 0)
+result.TeamList[0]                       // The root DTO (always at index 0)
 
+result.TeamList                          // NormalizedTeam[] (typed array)
 result.PersonList                        // NormalizedPerson[] (typed array)
 result.AddressList                       // NormalizedAddress[] (typed array)
 // All collections are typed properties — no string-keyed lookups.

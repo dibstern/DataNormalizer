@@ -16,23 +16,35 @@ A .NET source generator that normalizes nested object graphs into flat, deduplic
 ```csharp
 var sharedAddress = new Address { City = "Seattle", Zip = "98101" };
 
-var people = new[]
+var team = new Team
 {
-    new Person { Name = "Alice", Home = sharedAddress },
-    new Person { Name = "Bob",   Home = sharedAddress },
+    Name = "Engineering",
+    Members = new[]
+    {
+        new Person { Name = "Alice", Home = sharedAddress },
+        new Person { Name = "Bob",   Home = sharedAddress },
+    },
 };
 ```
 
-**After** — flat, deduplicated DTOs with integer index references:
+**After** — flat, deduplicated container with integer index references:
 
-```csharp
-// NormalizedPerson { Name = "Alice", HomeIndex = 0 }
-// NormalizedPerson { Name = "Bob",   HomeIndex = 0 }  ← same index, deduplicated
-//
-// Address collection: [ NormalizedAddress { City = "Seattle", Zip = "98101" } ]
+```json
+{
+  "TeamList": [
+    { "Name": "Engineering", "MembersIndices": [0, 1] }
+  ],
+  "PersonList": [
+    { "Name": "Alice", "HomeIndex": 0 },
+    { "Name": "Bob",   "HomeIndex": 0 }
+  ],
+  "AddressList": [
+    { "City": "Seattle", "Zip": "98101" }
+  ]
+}
 ```
 
-Shared `Address` instances are stored once. References become integer indices into flat collections.
+Shared `Address` instances are stored once. References become integer indices into typed arrays.
 
 ## Get Started
 
@@ -47,7 +59,7 @@ dotnet add package DataNormalizer
 
 ## Target Frameworks
 
-The runtime library targets `net8.0`, `net9.0`, and `net10.0`. The source generator targets `netstandard2.0` (a Roslyn requirement) and is bundled in the same NuGet package.
+The runtime library targets `net6.0`, `net7.0`, `net8.0`, `net9.0`, and `net10.0`. The source generator targets `netstandard2.0` (a Roslyn requirement) and is bundled in the same NuGet package.
 
 ## License
 
