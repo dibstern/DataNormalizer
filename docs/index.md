@@ -6,6 +6,7 @@ _layout: landing
 
 A .NET source generator that normalizes nested object graphs into flat, deduplicated representations.
 
+[![CI](https://github.com/dibstern/DataNormalizer/actions/workflows/ci.yml/badge.svg)](https://github.com/dibstern/DataNormalizer/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/DataNormalizer.svg)](https://www.nuget.org/packages/DataNormalizer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/dibstern/DataNormalizer/blob/main/LICENSE)
 
