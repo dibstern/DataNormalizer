@@ -44,7 +44,7 @@ If the project uses a `Version.props` file, it should only be imported in `Direc
 ```
 DataNormalizer/
 ├── src/
-│   ├── DataNormalizer/                    # Runtime library (net8.0;net9.0)
+│   ├── DataNormalizer/                    # Runtime library (net6.0;net7.0;net8.0;net9.0;net10.0)
 │   │   ├── Attributes/                   # Marker attributes for source generator
 │   │   ├── Configuration/                # Fluent builder API (no-op at runtime)
 │   │   ├── Runtime/                      # NormalizationContext

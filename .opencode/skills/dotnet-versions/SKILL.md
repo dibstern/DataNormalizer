@@ -1,6 +1,6 @@
 ---
 name: dotnet-versions
-description: Multi-targeting .NET 8/9 and netstandard2.0 for the DataNormalizer project. Covers TargetFrameworks configuration, conditional compilation with preprocessor directives, TFM-specific APIs, test project targeting, and CI SDK installation.
+description: Multi-targeting .NET 6/7/8/9/10 and netstandard2.0 for the DataNormalizer project. Covers TargetFrameworks configuration, conditional compilation with preprocessor directives, TFM-specific APIs, test project targeting, and CI SDK installation.
 ---
 
 # Multi-Targeting .NET Versions
@@ -11,11 +11,11 @@ description: Multi-targeting .NET 8/9 and netstandard2.0 for the DataNormalizer 
 
 ```xml
 <PropertyGroup>
-  <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+  <TargetFrameworks>net6.0;net7.0;net8.0;net9.0;net10.0</TargetFrameworks>
 </PropertyGroup>
 ```
 
-The runtime library multi-targets to support consumers on any of these frameworks. Each TFM produces a separate DLL in the NuGet package under `lib/net8.0/`, `lib/net9.0/`, `lib/net10.0/`.
+The runtime library multi-targets to support consumers on any of these frameworks. Each TFM produces a separate DLL in the NuGet package under `lib/net6.0/`, `lib/net7.0/`, `lib/net8.0/`, `lib/net9.0/`, `lib/net10.0/`.
 
 ### Source Generator (DataNormalizer.Generators)
 

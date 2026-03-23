@@ -186,7 +186,6 @@ Each file contains exactly one type. The filename must match the type name.
 
 ```
 NormalizationContext.cs     -> class NormalizationContext
-// NormalizedResult was deleted — container DTOs are now source-generated per root type
 TypeGraphNode.cs            -> record TypeGraphNode
 PropertyKind.cs             -> enum PropertyKind
 ```

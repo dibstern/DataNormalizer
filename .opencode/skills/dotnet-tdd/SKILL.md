@@ -242,7 +242,7 @@ Assert.That(result, Is.AssignableTo<IEquatable<TestDto>>());
 Assert.That(() => context.AddToCollection("key", -1, obj),
     Throws.InstanceOf<ArgumentOutOfRangeException>());
 
-Assert.That(() => new NormalizationContext().GetCollection<TestDto>("missing"),
+Assert.That(() => new Dictionary<string, int>()["missing"],
     Throws.InstanceOf<KeyNotFoundException>());
 
 Assert.That(() => DoSomething(), Throws.Nothing);  // no exception
@@ -369,10 +369,10 @@ public void GetOrAddIndex_FirstObject_ReturnsZeroAndIsNew()
 public void Context_WorksCorrectly()
 {
     var ctx = new NormalizationContext();
-    ctx.GetOrAddIndex("person", new TestDto("Alice", 30));
-    Assert.That(ctx.GetCollection<TestDto>("person"), Is.Empty); // separate concern — test separately
-    ctx.AddToCollection("person", 0, new TestDto("Alice", 30));
-    Assert.That(ctx.GetCollection<TestDto>("person"), Has.Count.EqualTo(1)); // separate concern — test separately
+    var (idx1, isNew1) = ctx.GetOrAddIndex("person", new TestDto("Alice", 30));
+    Assert.That(isNew1, Is.True); // separate concern — test separately
+    var (idx2, isNew2) = ctx.GetOrAddIndex("person", new TestDto("Alice", 30));
+    Assert.That(idx1, Is.EqualTo(idx2)); // separate concern — test separately
 }
 ```
 

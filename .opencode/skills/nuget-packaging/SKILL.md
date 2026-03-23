@@ -14,7 +14,9 @@ DataNormalizer ships as a **single NuGet package** that bundles both the runtime
 ```
 DataNormalizer.nupkg
 ├── lib/
-│   ├── net8.0/DataNormalizer.dll         # Runtime types
+│   ├── net6.0/DataNormalizer.dll         # Runtime types
+│   ├── net7.0/DataNormalizer.dll
+│   ├── net8.0/DataNormalizer.dll
 │   ├── net9.0/DataNormalizer.dll
 │   └── net10.0/DataNormalizer.dll
 ├── analyzers/
@@ -184,6 +186,8 @@ unzip -l DataNormalizer.1.0.0.zip
 ```
 
 Expected contents:
+- `lib/net6.0/DataNormalizer.dll`
+- `lib/net7.0/DataNormalizer.dll`
 - `lib/net8.0/DataNormalizer.dll`
 - `lib/net9.0/DataNormalizer.dll`
 - `lib/net10.0/DataNormalizer.dll`

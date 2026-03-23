@@ -365,16 +365,18 @@ public (int Index, bool IsNew) GetOrAddIndex<TDto>(string typeKey, TDto dto)
     // Compiler enforces TDto has Equals for deduplication
 }
 
-// Class constraint for reference type collections (internal runtime API)
-public IReadOnlyList<T> GetCollection<T>(string typeKey) where T : class
-    => collections.TryGetValue(typeKey, out var list)
-        ? list.Cast<T>().ToList()
-        : Array.Empty<T>();
+// Class constraint for reference type lookups
+public T? FindById<T>(Guid id) where T : class
+    => store.TryGetValue(id, out var obj) && obj is T typed
+        ? typed
+        : null;
 
 // Multiple constraints
-public T Resolve<T>(object container) where T : class, IEquatable<T>, new()
+public T CreateAndRegister<T>() where T : class, IEquatable<T>, new()
 {
-    // ...
+    var instance = new T();
+    registry.Add(instance);
+    return instance;
 }
 ```
 
