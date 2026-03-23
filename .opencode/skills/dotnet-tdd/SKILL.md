@@ -235,16 +235,15 @@ Assert.That(value, Is.Zero);
 Assert.That(actual, Is.EqualTo(3.14).Within(0.01));   // floating point
 
 // === Type ===
-Assert.That(result, Is.InstanceOf<NormalizedResult<TestDto>>());
+Assert.That(result, Is.InstanceOf<NormalizedTestDtoResult>());
 Assert.That(result, Is.AssignableTo<IEquatable<TestDto>>());
 
 // === Exceptions ===
 Assert.That(() => context.AddToCollection("key", -1, obj),
     Throws.InstanceOf<ArgumentOutOfRangeException>());
 
-Assert.That(() => new NormalizationContext().Resolve<TestDto>("missing", 0),
-    Throws.InstanceOf<ArgumentOutOfRangeException>()
-        .With.Message.Contains("out of range"));
+Assert.That(() => new NormalizationContext().GetCollection<TestDto>("missing"),
+    Throws.InstanceOf<KeyNotFoundException>());
 
 Assert.That(() => DoSomething(), Throws.Nothing);  // no exception
 
@@ -282,8 +281,9 @@ public void Normalize_SharedAddress_DeduplicatesToOneEntry()
     var result = TestNormalization.Normalize(person);
 
     // Assert
-    Assert.That(result.GetCollection<NormalizedAddress>(), Has.Count.EqualTo(1));
-    Assert.That(result.Root.HomeAddressIndex, Is.EqualTo(result.Root.WorkAddressIndex));
+    Assert.That(result.AddressList, Has.Length.EqualTo(1));
+    var root = result.PersonList[result.RootIndex];
+    Assert.That(root.HomeAddressIndex, Is.EqualTo(root.WorkAddressIndex));
 }
 ```
 
@@ -320,10 +320,10 @@ public sealed class FakeNormalizationEngine : INormalizationEngine
 {
     public List<object> NormalizedObjects { get; } = [];
 
-    public NormalizedResult<T> Normalize<T>(T source)
+    public object Normalize<T>(T source)
     {
         NormalizedObjects.Add(source!);
-        return new NormalizedResult<T>(/* ... */);
+        return new { }; // Return a fake container DTO
     }
 }
 
@@ -370,9 +370,9 @@ public void Context_WorksCorrectly()
 {
     var ctx = new NormalizationContext();
     ctx.GetOrAddIndex("person", new TestDto("Alice", 30));
-    Assert.That(ctx.GetCollection<TestDto>("person"), Is.Empty); // separate concern
+    Assert.That(ctx.GetCollection<TestDto>("person"), Is.Empty); // separate concern — test separately
     ctx.AddToCollection("person", 0, new TestDto("Alice", 30));
-    Assert.That(ctx.GetCollection<TestDto>("person"), Has.Count.EqualTo(1)); // separate concern
+    Assert.That(ctx.GetCollection<TestDto>("person"), Has.Count.EqualTo(1)); // separate concern — test separately
 }
 ```
 

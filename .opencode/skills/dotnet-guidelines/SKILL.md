@@ -100,7 +100,7 @@ Apply `sealed` to all classes not intended for inheritance. In this project, nea
 ```csharp
 // CORRECT
 public sealed class NormalizationContext { }
-public sealed class NormalizedResult<TRoot> { }
+// Generated container DTOs are sealed (e.g., NormalizedPersonResult)
 
 // CORRECT - intended for inheritance
 public abstract class NormalizationConfig
@@ -186,7 +186,7 @@ Each file contains exactly one type. The filename must match the type name.
 
 ```
 NormalizationContext.cs     -> class NormalizationContext
-NormalizedResult.cs         -> class NormalizedResult<TRoot>
+// NormalizedResult was deleted — container DTOs are now source-generated per root type
 TypeGraphNode.cs            -> record TypeGraphNode
 PropertyKind.cs             -> enum PropertyKind
 ```

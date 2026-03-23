@@ -124,10 +124,10 @@ CSharpier wraps lines that exceed `printWidth: 120`:
 
 ```csharp
 // Before (too long)
-public static NormalizedResult<NormalizedPerson> Normalize(Person source, NormalizationContext context, CancellationToken cancellationToken)
+public static NormalizedPersonResult Normalize(Person source, NormalizationContext context, CancellationToken cancellationToken)
 
 // After (CSharpier wraps it)
-public static NormalizedResult<NormalizedPerson> Normalize(
+public static NormalizedPersonResult Normalize(
     Person source,
     NormalizationContext context,
     CancellationToken cancellationToken

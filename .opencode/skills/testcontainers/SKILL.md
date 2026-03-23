@@ -75,7 +75,7 @@ public sealed class DatabaseIntegrationTests
         var result = TestNormalization.Normalize(data.First());
 
         // Assert
-        Assert.That(result.Root, Is.Not.Null);
+        Assert.That(result.PersonList, Has.Length.GreaterThan(result.RootIndex));
     }
 }
 ```

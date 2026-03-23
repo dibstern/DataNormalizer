@@ -76,20 +76,18 @@ For each type in the graph, the generator creates:
 
 ## Working with the result
 
-The `Normalize` method returns a `NormalizedResult<T>`:
+The `Normalize` method returns a container DTO (`Normalized{RootType}Result`) with typed arrays for every entity type in the graph:
 
 ```csharp
 var result = AppNormalization.Normalize(person);
 
-result.Root              // The root normalized DTO
-result.RootIndex         // Index of the root in its type collection
+result.RootIndex                         // Index into the root type's entity list
+result.PersonList[result.RootIndex]      // The root DTO (resolve via index)
 
-result.GetCollection<NormalizedAddress>("Address")  // Flat collection by type key
-result.GetCollection<NormalizedAddress>()            // Same, using typeof(T).Name
-
-result.CollectionNames   // All type keys
-
-result.Resolve<NormalizedAddress>("Address", 0)      // Resolve by type key + index
+result.PersonList                        // NormalizedPerson[] (typed array)
+result.AddressList                       // NormalizedAddress[] (typed array)
+// All collections are typed properties — no string-keyed lookups.
+// The container serializes directly with System.Text.Json.
 ```
 
 For full API details, see the [API Reference](../api/index.md).

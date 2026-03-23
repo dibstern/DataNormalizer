@@ -146,14 +146,14 @@ DataNormalizer is a library — **always** use `ConfigureAwait(false)` in async 
 
 ```csharp
 // CORRECT - library code
-public async Task<NormalizedResult<T>> NormalizeAsync<T>(T source, CancellationToken cancellationToken = default)
+public async Task<NormalizedPersonResult> NormalizeAsync(Person source, CancellationToken cancellationToken = default)
 {
     var data = await LoadDataAsync(cancellationToken).ConfigureAwait(false);
     return Process(data);
 }
 
 // WRONG - missing ConfigureAwait in library
-public async Task<NormalizedResult<T>> NormalizeAsync<T>(T source)
+public async Task<NormalizedPersonResult> NormalizeAsync(Person source)
 {
     var data = await LoadDataAsync(); // potential deadlock
     return Process(data);
@@ -300,7 +300,7 @@ public sealed class NormalizerService(
     IOptions<NormalizerOptions> options,
     ILogger<NormalizerService> logger)
 {
-    public NormalizedResult<T> Normalize<T>(T source)
+    public object Normalize<T>(T source)
     {
         logger.LogDebug("Normalizing {Type}", typeof(T).Name);
         return engine.Process(source, options.Value);
@@ -311,15 +311,17 @@ public sealed class NormalizerService(
 ### Interface Segregation
 
 ```csharp
-// Small, focused interfaces
+// Small, focused interfaces — each NormalizeGraph<T>() produces
+// a concrete container type (e.g., NormalizedPersonResult), so
+// generic interfaces use object or per-config wrappers.
 public interface INormalizationEngine
 {
-    NormalizedResult<T> Normalize<T>(T source);
+    object Normalize<T>(T source);
 }
 
 public interface IDenormalizationEngine
 {
-    T Denormalize<T>(NormalizedResult<T> result);
+    T Denormalize<T>(object container);
 }
 ```
 
@@ -363,14 +365,14 @@ public (int Index, bool IsNew) GetOrAddIndex<TDto>(string typeKey, TDto dto)
     // Compiler enforces TDto has Equals for deduplication
 }
 
-// Class constraint for reference type collections
+// Class constraint for reference type collections (internal runtime API)
 public IReadOnlyList<T> GetCollection<T>(string typeKey) where T : class
     => collections.TryGetValue(typeKey, out var list)
         ? list.Cast<T>().ToList()
         : Array.Empty<T>();
 
 // Multiple constraints
-public T Resolve<T>(NormalizedResult<T> result) where T : class, IEquatable<T>, new()
+public T Resolve<T>(object container) where T : class, IEquatable<T>, new()
 {
     // ...
 }

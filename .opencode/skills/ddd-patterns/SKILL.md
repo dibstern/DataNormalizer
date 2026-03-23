@@ -209,11 +209,11 @@ public sealed record GetNormalizedOrderQuery(Guid ResultId);
 
 public sealed class GetNormalizedOrderHandler(IResultStore results)
 {
-    public async Task<NormalizedResult<NormalizedOrder>?> HandleAsync(
+    public async Task<NormalizedOrderResult?> HandleAsync(
         GetNormalizedOrderQuery query,
         CancellationToken cancellationToken = default)
     {
-        return await results.GetAsync<NormalizedOrder>(query.ResultId, cancellationToken)
+        return await results.GetAsync<NormalizedOrderResult>(query.ResultId, cancellationToken)
             .ConfigureAwait(false);
     }
 }

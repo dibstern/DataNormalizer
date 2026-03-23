@@ -161,7 +161,7 @@ Example:
 }
 ```
 
-DataNormalizer replaces this with strongly-typed `NormalizedResult<T>` containing typed DTO collections, which provides compile-time safety and IntelliSense.
+DataNormalizer replaces this with a generated container DTO (`Normalized{RootType}Result`) containing typed entity arrays (e.g., `PersonList`, `AddressList`), which provides compile-time safety and IntelliSense.
 
 ## NormalizerFactory and NormalizationContext
 
@@ -196,7 +196,7 @@ DataNormalizer's `NormalizationContext` serves a similar purpose (tracking indic
 | Type discovery | Runtime reflection | Compile-time Roslyn analysis |
 | Hash/serialize | Expression tree compilation | Source-generated code |
 | Startup cost | High (compiles expression trees) | Zero (code is pre-generated) |
-| Output type | `Dictionary<string, List<Dictionary<string, object>>>` | Strongly-typed `NormalizedResult<T>` |
+| Output type | `Dictionary<string, List<Dictionary<string, object>>>` | Generated container DTO (`Normalized{RootType}Result`) with typed arrays |
 | Deduplication | Hash-only (collision bug) | Equality-based (correct) |
 | Circular refs | Deferred serialization queue | Visited set + two-pass denormalization |
 | AOT support | No (dynamic code gen) | Yes (static code) |

@@ -47,7 +47,7 @@ DataNormalizer/
 │   ├── DataNormalizer/                    # Runtime library (net8.0;net9.0)
 │   │   ├── Attributes/                   # Marker attributes for source generator
 │   │   ├── Configuration/                # Fluent builder API (no-op at runtime)
-│   │   ├── Runtime/                      # NormalizationContext, NormalizedResult
+│   │   ├── Runtime/                      # NormalizationContext
 │   │   └── DataNormalizer.csproj
 │   └── DataNormalizer.Generators/         # Roslyn source generator (netstandard2.0)
 │       ├── Analysis/                      # ConfigurationParser, TypeGraphAnalyzer
@@ -204,7 +204,7 @@ Dependencies point inward:
 DataNormalizer/
 ├── Attributes/          # [NormalizeConfiguration], [NormalizeIgnore], etc.
 ├── Configuration/       # NormalizationConfig, NormalizeBuilder, etc.
-├── Runtime/             # NormalizationContext, NormalizedResult<T>
+├── Runtime/             # NormalizationContext
 └── DataNormalizer.csproj
 ```
 
