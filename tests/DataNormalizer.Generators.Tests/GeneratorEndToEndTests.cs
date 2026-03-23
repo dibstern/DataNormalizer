@@ -371,6 +371,97 @@ public sealed class GeneratorEndToEndTests
         Assert.That(result.CompilationErrors, Is.Empty);
     }
 
+    [Test]
+    public void E2E_MultipleRoots_ContainersOnlyHaveReachableEntityLists()
+    {
+        var source = """
+            using DataNormalizer.Attributes;
+            using DataNormalizer.Configuration;
+
+            namespace TestApp;
+
+            public class Address { public string Street { get; set; } = ""; }
+            public class PhoneNumber { public string Number { get; set; } = ""; }
+            public class Person
+            {
+                public string Name { get; set; } = "";
+                public Address HomeAddress { get; set; } = new();
+                public PhoneNumber Phone { get; set; } = new();
+            }
+            public class Order
+            {
+                public int Id { get; set; }
+                public Address ShippingAddress { get; set; } = new();
+            }
+
+            [NormalizeConfiguration]
+            public partial class TestConfig : NormalizationConfig
+            {
+                protected override void Configure(NormalizeBuilder builder)
+                {
+                    builder.NormalizeGraph<Person>();
+                    builder.NormalizeGraph<Order>();
+                }
+            }
+            """;
+
+        var result = RunGenerator(source);
+
+        // Find the container source for Person and Order
+        var personContainerSource = result
+            .GeneratedSources.First(s => s.hintName.Contains("NormalizedPersonResult"))
+            .source;
+        var orderContainerSource = result
+            .GeneratedSources.First(s => s.hintName.Contains("NormalizedOrderResult"))
+            .source;
+
+        // Person container should have Person, Address, PhoneNumber lists
+        Assert.That(personContainerSource, Does.Contain("PersonList"));
+        Assert.That(personContainerSource, Does.Contain("AddressList"));
+        Assert.That(personContainerSource, Does.Contain("PhoneNumberList"));
+        // Person container should NOT have Order list
+        Assert.That(personContainerSource, Does.Not.Contain("OrderList"));
+
+        // Order container should have Order and Address lists
+        Assert.That(orderContainerSource, Does.Contain("OrderList"));
+        Assert.That(orderContainerSource, Does.Contain("AddressList"));
+        // Order container should NOT have Person or PhoneNumber lists
+        Assert.That(orderContainerSource, Does.Not.Contain("PersonList"));
+        Assert.That(orderContainerSource, Does.Not.Contain("PhoneNumberList"));
+
+        // Normalizer: Person's Normalize method should populate Person, Address, PhoneNumber lists only
+        var normalizerSource = result.GeneratedSources.First(s => s.hintName.Contains("Normalizer.g.cs")).source;
+        // Extract the Person normalize method (from "Normalize(TestApp.Person" to the next public method or end)
+        var personNormalizeStart = normalizerSource.IndexOf("Normalize(TestApp.Person source)");
+        var orderNormalizeStart = normalizerSource.IndexOf("Normalize(TestApp.Order source)");
+        var personNormalizeMethod = normalizerSource.Substring(
+            personNormalizeStart,
+            orderNormalizeStart - personNormalizeStart
+        );
+        Assert.That(personNormalizeMethod, Does.Contain("result.PersonList"));
+        Assert.That(personNormalizeMethod, Does.Contain("result.AddressList"));
+        Assert.That(personNormalizeMethod, Does.Contain("result.PhoneNumberList"));
+        Assert.That(personNormalizeMethod, Does.Not.Contain("result.OrderList"));
+
+        // Order's Normalize method should populate Order and Address lists only
+        var orderNormalizeMethod = normalizerSource.Substring(orderNormalizeStart);
+        // Cut it at the first private method
+        var privateMethodStart = orderNormalizeMethod.IndexOf("    private static int Normalize");
+        if (privateMethodStart > 0)
+            orderNormalizeMethod = orderNormalizeMethod.Substring(0, privateMethodStart);
+        Assert.That(orderNormalizeMethod, Does.Contain("result.OrderList"));
+        Assert.That(orderNormalizeMethod, Does.Contain("result.AddressList"));
+        Assert.That(orderNormalizeMethod, Does.Not.Contain("result.PersonList"));
+        Assert.That(orderNormalizeMethod, Does.Not.Contain("result.PhoneNumberList"));
+
+        // Generated code should compile without errors
+        Assert.That(
+            result.CompilationErrors,
+            Is.Empty,
+            $"Generated code has compilation errors:\n{string.Join("\n", result.CompilationErrors)}"
+        );
+    }
+
     // ---- Test Infrastructure ----
 
     private static GeneratorRunResult RunGenerator(string source)

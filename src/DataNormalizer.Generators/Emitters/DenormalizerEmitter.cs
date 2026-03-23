@@ -6,7 +6,14 @@ namespace DataNormalizer.Generators.Emitters;
 
 internal static class DenormalizerEmitter
 {
-    public static string Emit(NormalizationModel model, IReadOnlyList<TypeGraphNode> allNodes)
+    public static string Emit(NormalizationModel model, IReadOnlyList<TypeGraphNode> allNodes) =>
+        Emit(model, allNodes, new Dictionary<string, IReadOnlyList<TypeGraphNode>>());
+
+    public static string Emit(
+        NormalizationModel model,
+        IReadOnlyList<TypeGraphNode> allNodes,
+        Dictionary<string, IReadOnlyList<TypeGraphNode>> perRootNodes
+    )
     {
         var sb = new StringBuilder();
 
@@ -34,7 +41,10 @@ internal static class DenormalizerEmitter
                     sb.AppendLine();
                 }
 
-                EmitDenormalizeMethod(sb, rootType, rootNode, allNodes);
+                var rootSpecificNodes = perRootNodes.ContainsKey(rootType.FullyQualifiedName)
+                    ? perRootNodes[rootType.FullyQualifiedName]
+                    : allNodes;
+                EmitDenormalizeMethod(sb, rootType, rootNode, rootSpecificNodes);
                 emittedRootCount++;
             }
         }

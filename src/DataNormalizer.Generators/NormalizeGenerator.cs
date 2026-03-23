@@ -69,6 +69,7 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
         // Analyze type graphs for all root types, deduplicate nodes
         var allNodes = new List<TypeGraphNode>();
         var emittedTypes = new HashSet<string>();
+        var perRootNodes = new Dictionary<string, IReadOnlyList<TypeGraphNode>>();
 
         foreach (var rootType in model.RootTypes)
         {
@@ -82,6 +83,8 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
                 model.AutoDiscover,
                 model.CopySourceAttributes
             );
+
+            perRootNodes[rootType.FullyQualifiedName] = nodes;
 
             foreach (var node in nodes)
             {
@@ -133,17 +136,20 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
         {
             ct.ThrowIfCancellationRequested();
             TypeGraphNode? rootNode = null;
-            for (var i = 0; i < allNodes.Count; i++)
+            var rootNodes = perRootNodes.ContainsKey(rootType.FullyQualifiedName)
+                ? perRootNodes[rootType.FullyQualifiedName]
+                : (IReadOnlyList<TypeGraphNode>)allNodes;
+            for (var i = 0; i < rootNodes.Count; i++)
             {
-                if (allNodes[i].TypeFullName == rootType.FullyQualifiedName)
+                if (rootNodes[i].TypeFullName == rootType.FullyQualifiedName)
                 {
-                    rootNode = allNodes[i];
+                    rootNode = rootNodes[i];
                     break;
                 }
             }
             if (rootNode == null)
                 continue;
-            var containerSource = ContainerEmitter.Emit(rootNode, allNodes, model.JsonNamingPolicy);
+            var containerSource = ContainerEmitter.Emit(rootNode, rootNodes, model.JsonNamingPolicy);
             var containerHintPrefix = string.IsNullOrEmpty(model.ConfigNamespace)
                 ? model.ConfigClassName
                 : $"{model.ConfigNamespace}.{model.ConfigClassName}";
@@ -155,14 +161,14 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
         }
 
         // Emit Normalizer partial class
-        var normalizerSource = NormalizerEmitter.Emit(model, allNodes);
+        var normalizerSource = NormalizerEmitter.Emit(model, allNodes, perRootNodes);
         var normalizerHint = string.IsNullOrEmpty(model.ConfigNamespace)
             ? $"{model.ConfigClassName}.Normalizer.g.cs"
             : $"{model.ConfigNamespace}.{model.ConfigClassName}.Normalizer.g.cs";
         sources.Add(new GeneratorSourceEntry(normalizerHint, normalizerSource));
 
         // Emit Denormalizer partial class
-        var denormalizerSource = DenormalizerEmitter.Emit(model, allNodes);
+        var denormalizerSource = DenormalizerEmitter.Emit(model, allNodes, perRootNodes);
         var denormalizerHint = string.IsNullOrEmpty(model.ConfigNamespace)
             ? $"{model.ConfigClassName}.Denormalizer.g.cs"
             : $"{model.ConfigNamespace}.{model.ConfigClassName}.Denormalizer.g.cs";
