@@ -146,6 +146,66 @@ internal static class EmitterHelpers
         return string.IsNullOrEmpty(ns) ? containerName : $"{ns}.{containerName}";
     }
 
+    // ---- Naming-aware overloads ----
+
+    public static string GetDtoName(string typeName, NamingModel naming)
+    {
+        return $"{naming.DtoPrefix}{typeName}{naming.DtoSuffix}";
+    }
+
+    public static string GetDtoFullName(string typeFullName, string typeName, NamingModel naming)
+    {
+        var ns = GetNamespace(typeFullName);
+        var dtoName = GetDtoName(typeName, naming);
+        return string.IsNullOrEmpty(ns) ? dtoName : $"{ns}.{dtoName}";
+    }
+
+    public static string GetContainerName(string typeName, NamingModel naming)
+    {
+        return $"{typeName}Result{naming.ContainerSuffix}";
+    }
+
+    public static string GetContainerFullName(string typeFullName, string typeName, NamingModel naming)
+    {
+        var ns = GetNamespace(typeFullName);
+        var containerName = GetContainerName(typeName, naming);
+        return string.IsNullOrEmpty(ns) ? containerName : $"{ns}.{containerName}";
+    }
+
+    public static string GetListPropertyName(
+        TypeGraphNode node,
+        IReadOnlyList<TypeGraphNode> allNodes,
+        NamingModel naming
+    )
+    {
+        var baseName = node.TypeName;
+
+        var count = 0;
+        for (var i = 0; i < allNodes.Count; i++)
+        {
+            if (allNodes[i].TypeName == node.TypeName)
+            {
+                count++;
+            }
+        }
+
+        if (count > 1)
+        {
+            var ns = GetNamespace(node.TypeFullName);
+            if (!string.IsNullOrEmpty(ns))
+            {
+                baseName = ns.Replace(".", "") + baseName;
+            }
+        }
+
+        if (string.IsNullOrEmpty(naming.DtoSuffix))
+        {
+            return $"{baseName}List";
+        }
+
+        return ToPlural($"{baseName}{naming.DtoSuffix}");
+    }
+
     private static bool IsVowel(char c)
     {
         return "aeiouAEIOU".IndexOf(c) >= 0;
