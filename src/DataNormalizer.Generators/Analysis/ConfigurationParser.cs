@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using DataNormalizer.Generators.Models;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DataNormalizer.Generators.Analysis;
@@ -49,6 +50,14 @@ internal static class ConfigurationParser
             JsonNamingPolicy = context.JsonNamingPolicy,
             AutoDiscover = autoDiscover,
             UseReferenceTrackingForCycles = context.UseReferenceTrackingForCycles,
+            Naming = new NamingModel
+            {
+                DtoPrefix = context.GraphDtoPrefix ?? context.GlobalDtoPrefix,
+                DtoSuffix = context.GraphDtoSuffix ?? context.GlobalDtoSuffix,
+                ContainerSuffix = context.GraphContainerSuffix ?? context.GlobalContainerSuffix,
+                EmitJsonPropertyNames =
+                    context.GraphEmitJsonPropertyNames ?? context.GlobalEmitJsonPropertyNames,
+            },
         };
     }
 
@@ -64,6 +73,11 @@ internal static class ConfigurationParser
 
                 case ExpressionStatementSyntax exprStmt when exprStmt.Expression is InvocationExpressionSyntax inv:
                     ProcessTopLevelInvocation(inv, context);
+                    break;
+
+                case ExpressionStatementSyntax exprStmt
+                    when exprStmt.Expression is AssignmentExpressionSyntax assignment:
+                    ProcessAssignment(assignment, context);
                     break;
             }
         }
@@ -139,8 +153,17 @@ internal static class ConfigurationParser
                 context.CopySourceAttributes = true;
                 return ReceiverKind.GraphBuilder;
 
+            case "UseNaming" when receiverKind == ReceiverKind.NormalizeBuilder:
+                ProcessUseNamingLambda(invocation, context, isGraph: false);
+                return ReceiverKind.NormalizeBuilder;
+
+            case "UseNaming" when receiverKind == ReceiverKind.GraphBuilder:
+                ProcessUseNamingLambda(invocation, context, isGraph: true);
+                return ReceiverKind.GraphBuilder;
+
             case "UseJsonNaming" when receiverKind == ReceiverKind.GraphBuilder:
                 context.JsonNamingPolicy = "CamelCase";
+                context.GlobalEmitJsonPropertyNames = true;
                 return ReceiverKind.GraphBuilder;
 
             case "UseReferenceTrackingForCycles" when receiverKind == ReceiverKind.GraphBuilder:
@@ -357,6 +380,121 @@ internal static class ConfigurationParser
         }
     }
 
+    private static void ProcessUseNamingLambda(
+        InvocationExpressionSyntax invocation,
+        ParseContext context,
+        bool isGraph
+    )
+    {
+        if (invocation.ArgumentList.Arguments.Count == 0)
+            return;
+
+        var lambdaArg = invocation.ArgumentList.Arguments[0].Expression;
+        var lambdaParamName = GetLambdaParameterName(lambdaArg);
+        if (lambdaParamName is null)
+            return;
+
+        context.ReceiverMap[lambdaParamName] = ReceiverKind.NamingBuilder;
+        context.IsParsingGraphNaming = isGraph;
+
+        try
+        {
+            var body = GetLambdaBody(lambdaArg);
+            if (body is BlockSyntax block)
+            {
+                ProcessStatements(block.Statements, context);
+            }
+        }
+        finally
+        {
+            context.IsParsingGraphNaming = false;
+        }
+    }
+
+    private static void ProcessAssignment(AssignmentExpressionSyntax assignment, ParseContext context)
+    {
+        // Extract receiver and property name from left-hand side: n.DtoSuffix
+        if (assignment.Left is not MemberAccessExpressionSyntax memberAccess)
+            return;
+
+        if (memberAccess.Expression is not IdentifierNameSyntax receiverId)
+            return;
+
+        var receiverName = receiverId.Identifier.Text;
+        if (!context.ReceiverMap.TryGetValue(receiverName, out var receiverKind))
+            return;
+
+        if (receiverKind != ReceiverKind.NamingBuilder)
+            return;
+
+        var propertyName = memberAccess.Name.Identifier.Text;
+
+        switch (propertyName)
+        {
+            case "DtoPrefix":
+            case "DtoSuffix":
+            case "ContainerSuffix":
+                if (assignment.Right is not LiteralExpressionSyntax stringLiteral)
+                    return;
+                var stringValue = stringLiteral.Token.ValueText;
+                SetNamingStringProperty(propertyName, stringValue, context);
+                break;
+
+            case "EmitJsonPropertyNames":
+                if (assignment.Right.IsKind(SyntaxKind.TrueLiteralExpression))
+                    SetNamingBoolProperty(propertyName, true, context);
+                else if (assignment.Right.IsKind(SyntaxKind.FalseLiteralExpression))
+                    SetNamingBoolProperty(propertyName, false, context);
+                // Non-literal RHS: silently ignored
+                break;
+        }
+    }
+
+    private static void SetNamingStringProperty(string propertyName, string value, ParseContext context)
+    {
+        if (context.IsParsingGraphNaming)
+        {
+            switch (propertyName)
+            {
+                case "DtoPrefix":
+                    context.GraphDtoPrefix = value;
+                    break;
+                case "DtoSuffix":
+                    context.GraphDtoSuffix = value;
+                    break;
+                case "ContainerSuffix":
+                    context.GraphContainerSuffix = value;
+                    break;
+            }
+        }
+        else
+        {
+            switch (propertyName)
+            {
+                case "DtoPrefix":
+                    context.GlobalDtoPrefix = value;
+                    break;
+                case "DtoSuffix":
+                    context.GlobalDtoSuffix = value;
+                    break;
+                case "ContainerSuffix":
+                    context.GlobalContainerSuffix = value;
+                    break;
+            }
+        }
+    }
+
+    private static void SetNamingBoolProperty(string propertyName, bool value, ParseContext context)
+    {
+        if (propertyName != "EmitJsonPropertyNames")
+            return;
+
+        if (context.IsParsingGraphNaming)
+            context.GraphEmitJsonPropertyNames = value;
+        else
+            context.GlobalEmitJsonPropertyNames = value;
+    }
+
     private static INamedTypeSymbol? GetTypeArgumentSymbol(
         MemberAccessExpressionSyntax memberAccess,
         SemanticModel semanticModel
@@ -455,6 +593,7 @@ internal static class ConfigurationParser
         NormalizeBuilder,
         GraphBuilder,
         TypeBuilder,
+        NamingBuilder,
     }
 
     private sealed class ParseContext(SemanticModel semanticModel)
@@ -474,6 +613,24 @@ internal static class ConfigurationParser
         public string? JsonNamingPolicy { get; set; }
 
         public bool UseReferenceTrackingForCycles { get; set; }
+
+        // Global naming values (mutable during parse)
+        public string GlobalDtoPrefix { get; set; } = "";
+        public string GlobalDtoSuffix { get; set; } = "Dto";
+        public string GlobalContainerSuffix { get; set; } = "Dto";
+        public bool GlobalEmitJsonPropertyNames { get; set; } = true;
+
+        // Per-graph overrides (null = not set, use global).
+        // NOTE: These are never cleared between multiple NormalizeGraph calls. Phase 1 assumes
+        // a single graph per config. When per-graph naming is supported, these will need to be
+        // reset (or moved to a per-graph structure) before processing each graph lambda.
+        public string? GraphDtoPrefix { get; set; }
+        public string? GraphDtoSuffix { get; set; }
+        public string? GraphContainerSuffix { get; set; }
+        public bool? GraphEmitJsonPropertyNames { get; set; }
+
+        // Track whether current NamingBuilder lambda is global or graph-level
+        public bool IsParsingGraphNaming { get; set; }
 
         /// <summary>
         /// Maps variable/parameter names to their receiver kind.

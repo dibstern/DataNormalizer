@@ -260,6 +260,252 @@ public sealed class ConfigurationParserTests
         Assert.That(model.UseReferenceTrackingForCycles, Is.True);
     }
 
+    // ---- UseNaming Tests ----
+
+    [Test]
+    public void Parse_UseNaming_StringProperties_ExtractsDtoSuffixAndPrefix()
+    {
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n =>
+            {
+                n.DtoSuffix = "Dto";
+                n.DtoPrefix = "";
+            });
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.DtoSuffix, Is.EqualTo("Dto"));
+        Assert.That(model.Naming.DtoPrefix, Is.EqualTo(""));
+    }
+
+    [Test]
+    public void Parse_UseNaming_EmitJsonPropertyNamesFalse_ParsesBooleanFalse()
+    {
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n =>
+            {
+                n.EmitJsonPropertyNames = false;
+            });
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.EmitJsonPropertyNames, Is.False);
+    }
+
+    [Test]
+    public void Parse_UseNaming_EmitJsonPropertyNamesTrue_ParsesBooleanTrue()
+    {
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n =>
+            {
+                n.EmitJsonPropertyNames = true;
+            });
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.EmitJsonPropertyNames, Is.True);
+    }
+
+    [Test]
+    public void Parse_NoUseNaming_ReturnsDefaultNamingModel()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.DtoPrefix, Is.EqualTo(""));
+        Assert.That(model.Naming.DtoSuffix, Is.EqualTo("Dto"));
+        Assert.That(model.Naming.ContainerSuffix, Is.EqualTo("Dto"));
+        Assert.That(model.Naming.EmitJsonPropertyNames, Is.True);
+    }
+
+    [Test]
+    public void Parse_UseNaming_NonLiteralRhs_SilentlyIgnored_DefaultPreserved()
+    {
+        var model = ParseConfig(
+            """
+            var suffix = "Model";
+            builder.UseNaming(n =>
+            {
+                n.DtoSuffix = suffix;
+            });
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.DtoSuffix, Is.EqualTo("Dto"));
+    }
+
+    [Test]
+    public void Parse_UseNaming_CalledTwice_LastValuesWin()
+    {
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n =>
+            {
+                n.DtoSuffix = "First";
+            });
+            builder.UseNaming(n =>
+            {
+                n.DtoSuffix = "Second";
+            });
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.DtoSuffix, Is.EqualTo("Second"));
+    }
+
+    // ---- UseNaming Merge Semantics Tests ----
+
+    [Test]
+    public void Parse_UseNaming_GlobalDtoSuffix_GraphContainerSuffix_BothApply()
+    {
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n =>
+            {
+                n.DtoSuffix = "Model";
+            });
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    n.ContainerSuffix = "Container";
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.DtoSuffix, Is.EqualTo("Model"));
+        Assert.That(model.Naming.ContainerSuffix, Is.EqualTo("Container"));
+    }
+
+    [Test]
+    public void Parse_UseNaming_GlobalOnly_AllGlobalValuesApply()
+    {
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n =>
+            {
+                n.DtoPrefix = "Normalized";
+                n.DtoSuffix = "Model";
+                n.ContainerSuffix = "Result";
+                n.EmitJsonPropertyNames = false;
+            });
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.DtoPrefix, Is.EqualTo("Normalized"));
+        Assert.That(model.Naming.DtoSuffix, Is.EqualTo("Model"));
+        Assert.That(model.Naming.ContainerSuffix, Is.EqualTo("Result"));
+        Assert.That(model.Naming.EmitJsonPropertyNames, Is.False);
+    }
+
+    [Test]
+    public void Parse_UseNaming_GraphOverridesEverything_FullyOverridden()
+    {
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n =>
+            {
+                n.DtoPrefix = "GlobalPrefix";
+                n.DtoSuffix = "GlobalSuffix";
+                n.ContainerSuffix = "GlobalContainer";
+                n.EmitJsonPropertyNames = false;
+            });
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    n.DtoPrefix = "GraphPrefix";
+                    n.DtoSuffix = "GraphSuffix";
+                    n.ContainerSuffix = "GraphContainer";
+                    n.EmitJsonPropertyNames = true;
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.DtoPrefix, Is.EqualTo("GraphPrefix"));
+        Assert.That(model.Naming.DtoSuffix, Is.EqualTo("GraphSuffix"));
+        Assert.That(model.Naming.ContainerSuffix, Is.EqualTo("GraphContainer"));
+        Assert.That(model.Naming.EmitJsonPropertyNames, Is.True);
+    }
+
+    [Test]
+    public void Parse_UseNaming_ContainerSuffix_Extracted()
+    {
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n =>
+            {
+                n.ContainerSuffix = "Result";
+            });
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.ContainerSuffix, Is.EqualTo("Result"));
+    }
+
+    [Test]
+    public void Parse_UseJsonNaming_SetsEmitJsonPropertyNamesTrue()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonNaming(System.Text.Json.JsonNamingPolicy.CamelCase);
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.EmitJsonPropertyNames, Is.True);
+    }
+
     // ---- Test Helper ----
 
     private static NormalizationModel ParseConfig(string configureBody, string additionalTypes)
