@@ -277,3 +277,4 @@ public partial class SearchResponseResultDto
 | Modify | `Emitters/NormalizerEmitter.cs` -- set Result, conditional root list |
 | Modify | `Emitters/DenormalizerEmitter.cs` -- read from Result |
 | Modify | `Emitters/DtoEmitter.cs` -- JsonNameOverride on properties |
+| New | `DiagnosticDescriptors.cs` -- DN1001 for unparsed config statements |

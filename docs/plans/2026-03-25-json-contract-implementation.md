@@ -719,7 +719,147 @@ test: add full search-response integration tests for JSON contract customization
 
 ---
 
-### Task 13: Final build and format check
+### Task 13: Add compilation checks to emitter unit tests
+
+The emitter unit tests use string matching (`Does.Contain`) to verify generated code. This catches content but not validity -- a test can pass while the generated code has syntax errors, missing usings, or broken type references. Fix this by compiling the emitter output in each unit test using Roslyn.
+
+**Files:**
+- Create: `tests/DataNormalizer.Generators.Tests/Emitters/EmitterCompilationHelper.cs`
+- Modify: `tests/DataNormalizer.Generators.Tests/Emitters/DtoEmitterTests.cs`
+- Modify: `tests/DataNormalizer.Generators.Tests/Emitters/ContainerEmitterTests.cs`
+- Modify: `tests/DataNormalizer.Generators.Tests/Emitters/NormalizerEmitterTests.cs`
+- Modify: `tests/DataNormalizer.Generators.Tests/Emitters/DenormalizerEmitterTests.cs`
+
+**Step 1: Create EmitterCompilationHelper**
+
+Shared helper that compiles one or more generated source strings and asserts zero errors:
+
+```csharp
+internal static class EmitterCompilationHelper
+{
+    private static readonly MetadataReference[] References = new[]
+    {
+        MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+        MetadataReference.CreateFromFile(typeof(System.Text.Json.Serialization.JsonPropertyNameAttribute).Assembly.Location),
+        // Add other required references (System.Runtime, System.Collections, etc.)
+    };
+
+    public static void AssertCompiles(params string[] sources)
+    {
+        var trees = sources.Select(s => CSharpSyntaxTree.ParseText(s)).ToArray();
+        var compilation = CSharpCompilation.Create(
+            "EmitterTest",
+            trees,
+            References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var diagnostics = compilation.GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        Assert.That(diagnostics, Is.Empty,
+            $"Generated code has compilation errors:\n{string.Join("\n", diagnostics.Select(d => d.ToString()))}");
+    }
+}
+```
+
+**Step 2: Add compilation assertions to existing tests**
+
+For each emitter's "main" test case, add a call to `EmitterCompilationHelper.AssertCompiles(result)` after the existing string assertions. The compilation check runs on the same output string -- no new test methods needed, just an additional assertion per test.
+
+For tests that emit multiple related files (e.g., container + DTOs), pass all sources together so cross-file references resolve:
+
+```csharp
+var dtoResult = DtoEmitter.Emit(personNode, false, naming);
+var containerResult = ContainerEmitter.Emit(personNode, allNodes, naming, jsonContract);
+EmitterCompilationHelper.AssertCompiles(dtoResult, containerResult);
+```
+
+**Step 3: Write tests for compilation of generated code with JsonNameOverride**
+
+- Emit a DTO with `JsonNameOverride` properties → compiles
+- Emit a container with `RootPropertyName` and collection overrides → compiles
+- Emit normalizer + denormalizer with root property → compiles together
+
+**Step 4: Run tests, commit**
+
+```
+feat: add compilation checks to emitter unit tests
+```
+
+---
+
+### Task 14: Add unparsed config statement diagnostics
+
+When the parser encounters a statement inside a known builder lambda that it cannot parse, it should emit a compiler error. This makes the parser's limitations visible at build time rather than silently producing wrong defaults.
+
+**Files:**
+- Modify: `src/DataNormalizer.Generators/Analysis/ConfigurationParser.cs`
+- Create: `src/DataNormalizer.Generators/DiagnosticDescriptors.cs` (or modify if exists)
+- Modify: `src/DataNormalizer.Generators/Models/NormalizationModel.cs`
+- Test: `tests/DataNormalizer.Generators.Tests/Analysis/ConfigurationParserTests.cs`
+
+**Step 1: Define the diagnostic descriptor**
+
+```csharp
+internal static class DiagnosticDescriptors
+{
+    public static readonly DiagnosticDescriptor UnparsedConfigStatement = new(
+        id: "DN1001",
+        title: "Unparsed configuration statement",
+        messageFormat: "Configuration statement could not be parsed and will be ignored: '{0}'",
+        category: "DataNormalizer",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+}
+```
+
+**Step 2: Add diagnostics collection to ParseContext**
+
+```csharp
+public List<Diagnostic> Diagnostics { get; } = new();
+```
+
+**Step 3: Track which lambdas are "known builder lambdas"**
+
+Add a counter or flag to ParseContext: `public int BuilderLambdaDepth { get; set; }`. Increment when entering a builder lambda body (UseNaming, UseJsonContract, ForType, NormalizeGraph), decrement when leaving. Any statement inside a builder lambda that falls through to `default` in `ProcessStatements` should produce a diagnostic.
+
+**Step 4: Emit diagnostic for unrecognized statements**
+
+In `ProcessStatements`, after all case branches:
+
+```csharp
+default:
+    if (context.BuilderLambdaDepth > 0)
+    {
+        context.Diagnostics.Add(Diagnostic.Create(
+            DiagnosticDescriptors.UnparsedConfigStatement,
+            statement.GetLocation(),
+            statement.ToFullString().Trim()));
+    }
+    break;
+```
+
+**Step 5: Surface diagnostics in NormalizationModel and NormalizeGenerator**
+
+Add `ImmutableArray<Diagnostic> Diagnostics` to `NormalizationModel`. In `NormalizeGenerator.Execute`, report them via `context.ReportDiagnostic()`.
+
+**Step 6: Write failing tests**
+
+Tests:
+- `n.DtoSuffix = GetSuffix()` (non-literal RHS) → error DN1001
+- `if (true) { n.DtoSuffix = "Dto"; }` (conditional) → error DN1001 on the `if` statement
+- `Console.WriteLine("debug")` inside builder lambda → error DN1001
+- Valid statements (`n.DtoSuffix = "Dto"`, `graph.Inline<T>()`, `x.Reference(p => p.Line).JsonName("line")`) → no diagnostic
+- Statements outside builder lambdas (in Configure method body, not inside any lambda) → no diagnostic (user might have helper code)
+
+**Step 7: Run tests, commit**
+
+```
+feat: emit DN1001 error for unparsed configuration statements
+```
+
+---
+
+### Task 15: Final build and format check
 
 **Step 1:** `dotnet build --no-restore` → 0 errors
 **Step 2:** `dotnet csharpier check .` → all formatted
