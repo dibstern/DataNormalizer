@@ -30,6 +30,17 @@ public sealed class NormalizeBuilder
     }
 
     /// <summary>
+    /// Configures naming conventions for generated DTOs and containers.
+    /// </summary>
+    /// <param name="configure">An action to configure the naming builder.</param>
+    /// <returns>This builder instance for chaining.</returns>
+    public NormalizeBuilder UseNaming(Action<NamingBuilder> configure)
+    {
+        configure(new NamingBuilder());
+        return this;
+    }
+
+    /// <summary>
     /// Configures property-level behavior for a specific type.
     /// </summary>
     /// <typeparam name="T">The type to configure.</typeparam>

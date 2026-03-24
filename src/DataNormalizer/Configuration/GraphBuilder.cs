@@ -49,6 +49,17 @@ public sealed class GraphBuilder<T>
     }
 
     /// <summary>
+    /// Configures naming conventions for generated DTOs and containers.
+    /// </summary>
+    /// <param name="configure">An action to configure the naming builder.</param>
+    /// <returns>This builder instance for chaining.</returns>
+    public GraphBuilder<T> UseNaming(Action<NamingBuilder> configure)
+    {
+        configure(new NamingBuilder());
+        return this;
+    }
+
+    /// <summary>
     /// Sets JSON naming convention for generated properties.
     /// (v1: not yet implemented)
     /// </summary>
