@@ -18,6 +18,7 @@ internal sealed class NormalizationModel
     public string? JsonNamingPolicy { get; init; }
     public bool AutoDiscover { get; init; } = true;
     public bool UseReferenceTrackingForCycles { get; init; }
+    public NamingModel Naming { get; init; } = NamingModel.Default;
 }
 
 internal sealed class RootTypeInfo
