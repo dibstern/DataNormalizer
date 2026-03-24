@@ -1,27 +1,28 @@
-# Naming Policy System Implementation Plan
+# Naming Policy System Implementation Plan (Phase 1)
 
 > **For Agent:** REQUIRED SUB-SKILL: Use executing-plans to implement this plan task-by-task.
 
-**Goal:** Add a configurable naming policy system so generated DTOs, containers, and JSON property names can be customized, with new defaults (Dto suffix, always-on JsonPropertyName).
+**Goal:** Add a configurable naming policy system so generated DTO type names, container names, list property names, and JSON property names can be customized.
 
-**Architecture:** New `NamingBuilder` and `JsonContractBuilder` config classes in the runtime library (stubs -- parsed by the source generator). New `NamingModel`/`JsonContractModel` equatable records in the generator's Models layer. `ConfigurationParser` extended to parse the new syntax (including a new `ProcessAssignment` code path for property assignments). All four emitters updated to consult the naming model instead of hardcoded conventions.
+**Architecture:** New `NamingBuilder` config class in the runtime library (stub -- parsed by the source generator). New `NamingModel` equatable record in the generator's Models layer. `ConfigurationParser` extended to parse `UseNaming()` lambdas (including a new `ProcessAssignment` code path for property assignments). All four emitters updated to consult the naming model instead of hardcoded conventions.
 
 **Tech Stack:** C# 12, .NET source generators (Roslyn), NUnit 4, System.Text.Json
+
+**Scope:** Phase 1 covers naming policy only. Phase 2 (separate plan) will cover JSON contract customization: root property redesign, `UseJsonContract`, `Reference().JsonName()`, `[NormalizeJsonName]` attribute.
 
 **Key design decisions:**
 - Graph-level `UseNaming` MERGES with global defaults (only overrides explicitly set properties)
 - When `DtoSuffix` is empty, list property names fall back to `{TypeName}List` convention
-- CLR names stay semantic (`LineIndex`, `TransitImagesIndices`); JSON names are controlled via `[JsonPropertyName]`
+- `EmitJsonPropertyNames = true` by default (always emit `[JsonPropertyName]` with camelCase)
 
 ---
 
-### Task 1: Add NamingModel and JsonContractModel to generator Models
+### Task 1: Add NamingModel to generator Models
 
 **Files:**
 - Create: `src/DataNormalizer.Generators/Models/NamingModel.cs`
-- Create: `src/DataNormalizer.Generators/Models/JsonContractModel.cs`
 - Modify: `src/DataNormalizer.Generators/Models/NormalizationModel.cs`
-- Modify: `src/DataNormalizer.Generators/Models/AnalyzedProperty.cs`
+- Test: `tests/DataNormalizer.Generators.Tests/Models/NamingModelTests.cs`
 
 **Step 1: Create NamingModel**
 
@@ -64,117 +65,48 @@ internal sealed class NamingModel : IEquatable<NamingModel>
 }
 ```
 
-**Step 2: Create JsonContractModel**
-
-```csharp
-// src/DataNormalizer.Generators/Models/JsonContractModel.cs
-using System;
-using System.Collections.Immutable;
-
-namespace DataNormalizer.Generators.Models;
-
-internal sealed class JsonContractModel : IEquatable<JsonContractModel>
-{
-    public string? RootPropertyName { get; init; }
-    public ImmutableDictionary<string, string> CollectionJsonNames { get; init; } =
-        ImmutableDictionary<string, string>.Empty;
-
-    public bool Equals(JsonContractModel? other)
-    {
-        if (other is null) return false;
-        if (ReferenceEquals(this, other)) return true;
-        if (RootPropertyName != other.RootPropertyName) return false;
-        if (CollectionJsonNames.Count != other.CollectionJsonNames.Count) return false;
-        foreach (var kvp in CollectionJsonNames)
-        {
-            if (!other.CollectionJsonNames.TryGetValue(kvp.Key, out var otherVal) || kvp.Value != otherVal)
-                return false;
-        }
-        return true;
-    }
-
-    public override bool Equals(object? obj) => obj is JsonContractModel other && Equals(other);
-
-    public override int GetHashCode()
-    {
-        var hash = 17;
-        hash = (hash * 397) ^ (RootPropertyName?.GetHashCode() ?? 0);
-        hash = (hash * 397) ^ CollectionJsonNames.Count;
-        foreach (var kvp in CollectionJsonNames)
-        {
-            hash = (hash * 397) ^ kvp.Key.GetHashCode();
-            hash = (hash * 397) ^ kvp.Value.GetHashCode();
-        }
-        return hash;
-    }
-
-    public static JsonContractModel Default { get; } = new();
-}
-```
-
-**Step 3: Add NamingModel and JsonContractModel to NormalizationModel**
+**Step 2: Add NamingModel to NormalizationModel**
 
 In `src/DataNormalizer.Generators/Models/NormalizationModel.cs`, add:
 
 ```csharp
 public NamingModel Naming { get; init; } = NamingModel.Default;
-public JsonContractModel JsonContract { get; init; } = JsonContractModel.Default;
 ```
 
-> **Note:** Keep the existing `JsonNamingPolicy` field. It will be removed in Task 14. Until then, emitters should continue using `JsonNamingPolicy` for the old code path until explicitly switched in Tasks 6-9.
+> **Note:** Keep the existing `JsonNamingPolicy` field. It will be removed in Task 10. Until then, emitters continue using `JsonNamingPolicy` until explicitly switched in Tasks 4-7.
 
-**Step 4: Add JsonNameOverride to AnalyzedProperty**
-
-In `src/DataNormalizer.Generators/Models/AnalyzedProperty.cs`, add:
-
-```csharp
-public string? JsonNameOverride { get; init; }
-```
-
-**Step 5: Write unit tests for NamingModel and JsonContractModel equality**
+**Step 3: Write unit tests for NamingModel equality**
 
 Test file: `tests/DataNormalizer.Generators.Tests/Models/NamingModelTests.cs`
 
-Tests to write:
-- Two `NamingModel` instances with identical values → `Equals` returns `true`, `GetHashCode` matches
-- Two `NamingModel` instances differing only in `DtoSuffix` → `Equals` returns `false`
-- Two `NamingModel` instances differing only in `EmitJsonPropertyNames` → `Equals` returns `false`
+Tests:
+- Two identical instances → `Equals` returns `true`, `GetHashCode` matches
+- Differing only in `DtoSuffix` → `Equals` returns `false`
+- Differing only in `DtoPrefix` → `Equals` returns `false`
+- Differing only in `ContainerSuffix` → `Equals` returns `false`
+- Differing only in `EmitJsonPropertyNames` → `Equals` returns `false`
 - `NamingModel.Default` equality with `new NamingModel()` → `true`
-- `NamingModel` compared to `null` → `false`
+- Compared to `null` → `false`
 
-Test file: `tests/DataNormalizer.Generators.Tests/Models/JsonContractModelTests.cs`
-
-Tests to write:
-- Two `JsonContractModel` instances with same `RootPropertyName` and same `CollectionJsonNames` → `Equals` returns `true`, `GetHashCode` matches
-- Different `RootPropertyName` → `Equals` returns `false`
-- Same count but different keys in `CollectionJsonNames` → `Equals` returns `false`, `GetHashCode` differs
-- Same count but different values in `CollectionJsonNames` → `Equals` returns `false`
-- Empty `CollectionJsonNames` vs non-empty → `Equals` returns `false`
-- `JsonContractModel.Default` equality with `new JsonContractModel()` → `true`
-
-**Step 6: Run all tests to confirm no regressions and new tests pass**
+**Step 4: Run all tests**
 
 Run: `dotnet test tests/DataNormalizer.Generators.Tests/ --no-restore -v q`
-Expected: All existing tests still pass, new equality tests pass. The new NormalizationModel fields have defaults for the new naming convention, but existing emitter tests pass because emitters are not yet wired to these models.
+Expected: All existing tests pass, new equality tests pass.
 
-**Step 7: Commit**
+**Step 5: Commit**
 
 ```
-feat: add NamingModel, JsonContractModel, and JsonNameOverride to generator models
+feat: add NamingModel to generator models
 ```
 
 ---
 
-### Task 2: Add runtime configuration classes (NamingBuilder, JsonContractBuilder, ReferenceBuilder, NormalizeJsonNameAttribute)
+### Task 2: Add NamingBuilder runtime class and UseNaming() methods
 
 **Files:**
 - Create: `src/DataNormalizer/Configuration/NamingBuilder.cs`
-- Create: `src/DataNormalizer/Configuration/JsonContractBuilder.cs`
-- Create: `src/DataNormalizer/Configuration/ReferenceBuilder.cs`
-- Create: `src/DataNormalizer/Attributes/NormalizeJsonNameAttribute.cs`
 - Modify: `src/DataNormalizer/Configuration/NormalizeBuilder.cs`
 - Modify: `src/DataNormalizer/Configuration/GraphBuilder.cs`
-- Modify: `src/DataNormalizer/Configuration/TypeBuilder.cs`
 
 **Step 1: Create NamingBuilder**
 
@@ -194,69 +126,37 @@ public sealed class NamingBuilder
 }
 ```
 
-**Step 2: Create JsonContractBuilder**
+**Step 2: Add UseNaming to NormalizeBuilder**
 
 ```csharp
-// src/DataNormalizer/Configuration/JsonContractBuilder.cs
-namespace DataNormalizer.Configuration;
-
-public sealed class JsonContractBuilder
+public NormalizeBuilder UseNaming(Action<NamingBuilder> configure)
 {
-    public string? RootPropertyName { get; set; }
-    public void Collection<T>(string jsonName) { }
+    configure(new NamingBuilder());
+    return this;
 }
 ```
 
-**Step 3: Create ReferenceBuilder**
+**Step 3: Add UseNaming to GraphBuilder**
 
 ```csharp
-// src/DataNormalizer/Configuration/ReferenceBuilder.cs
-namespace DataNormalizer.Configuration;
-
-public sealed class ReferenceBuilder
+public GraphBuilder<T> UseNaming(Action<NamingBuilder> configure)
 {
-    public ReferenceBuilder JsonName(string jsonName) => this;
+    configure(new NamingBuilder());
+    return this;
 }
 ```
 
-**Step 4: Create NormalizeJsonNameAttribute**
-
-```csharp
-// src/DataNormalizer/Attributes/NormalizeJsonNameAttribute.cs
-namespace DataNormalizer.Attributes;
-
-[AttributeUsage(AttributeTargets.Property, Inherited = false)]
-public sealed class NormalizeJsonNameAttribute : Attribute
-{
-    public string Name { get; }
-    public NormalizeJsonNameAttribute(string name) => Name = name;
-}
-```
-
-> **Note:** `Inherited = false` matches the convention used by `NormalizeIgnoreAttribute` and `NormalizeIncludeAttribute`.
-
-**Step 5: Add UseNaming to NormalizeBuilder**
-
-**Step 6: Add UseNaming and UseJsonContract to GraphBuilder**
-
-**Step 7: Add Reference and ReferenceCollection to TypeBuilder**
-
-(Same code as before -- adding the method stubs to each builder class.)
-
-**Step 8: Run tests, Step 9: Commit**
+**Step 4: Run tests, commit**
 
 ```
-feat: add NamingBuilder, JsonContractBuilder, ReferenceBuilder, and NormalizeJsonNameAttribute
+feat: add NamingBuilder and UseNaming() builder methods
 ```
 
 ---
 
-### Task 3: Extend ConfigurationParser to parse new config syntax
+### Task 3: Extend ConfigurationParser to parse UseNaming()
 
-This is the most complex task. It requires three new parsing capabilities:
-1. **Property assignment parsing** (new code path) -- for `n.DtoSuffix = "Dto"`, `c.RootPropertyName = "result"`
-2. **Cross-type method chaining** -- for `x.Reference(p => p.Line).JsonName("line")`
-3. **Lambda parameter registration** -- for `UseNaming`/`UseJsonContract` lambda params
+This requires a new parsing capability: **property assignment parsing** for `n.DtoSuffix = "Dto"` inside lambdas.
 
 **Files:**
 - Modify: `src/DataNormalizer.Generators/Analysis/ConfigurationParser.cs`
@@ -264,15 +164,17 @@ This is the most complex task. It requires three new parsing capabilities:
 
 **Step 1: Write failing tests for UseNaming parsing**
 
-Add tests that verify:
-- `builder.UseNaming(n => { n.DtoSuffix = "Dto"; n.DtoPrefix = ""; n.ContainerSuffix = "Dto"; n.EmitJsonPropertyNames = true; })` is parsed into the NamingModel
-- `graph.UseNaming(n => { n.DtoSuffix = "Normalized"; })` merges with global (only overrides DtoSuffix)
-- Default NamingModel when no UseNaming is present
-- Boolean literal `true`/`false` parsed correctly for `EmitJsonPropertyNames`
+Tests:
+- `builder.UseNaming(n => { n.DtoSuffix = "Dto"; n.DtoPrefix = ""; })` → model has those values
+- `builder.UseNaming(n => { n.EmitJsonPropertyNames = false; })` → boolean false parsed
+- `builder.UseNaming(n => { n.EmitJsonPropertyNames = true; })` → boolean true parsed
+- No `UseNaming` → `NamingModel.Default` values
+- Assignment with non-literal RHS (e.g., `n.DtoSuffix = variable`) → silently ignored, default preserved
+- `UseNaming` called twice on builder → last values win
 
 **Step 2: Run tests to verify they fail**
 
-**Step 3: Extend ReceiverKind enum**
+**Step 3: Add NamingBuilder ReceiverKind**
 
 ```csharp
 private enum ReceiverKind
@@ -281,15 +183,13 @@ private enum ReceiverKind
     GraphBuilder,
     TypeBuilder,
     NamingBuilder,
-    JsonContractBuilder,
-    ReferenceBuilder,
 }
 ```
 
 **Step 4: Add naming fields to ParseContext**
 
 ```csharp
-// Naming config
+// Global naming values (mutable during parse)
 public string GlobalDtoPrefix { get; set; } = "";
 public string GlobalDtoSuffix { get; set; } = "Dto";
 public string GlobalContainerSuffix { get; set; } = "Dto";
@@ -301,136 +201,51 @@ public string? GraphDtoSuffix { get; set; }
 public string? GraphContainerSuffix { get; set; }
 public bool? GraphEmitJsonPropertyNames { get; set; }
 
-// JSON contract
-public string? RootPropertyName { get; set; }
-public Dictionary<string, string> CollectionJsonNames { get; } = new();
-
-// Per-property JSON name overrides: key = "TypeFqn.PropName", value = JSON name
-public Dictionary<string, string> PropertyJsonNames { get; } = new();
+// Track whether current NamingBuilder lambda is global or graph-level
+public bool IsParsingGraphNaming { get; set; }
 ```
 
-> **Note on merge semantics:** Graph-level `UseNaming` only overrides properties explicitly assigned in the lambda. Unset properties fall through to global defaults. This is implemented by tracking graph values as nullable and merging at the end.
+**Step 5: Add ProcessAssignment method**
 
-**Step 5: Add new ProcessAssignment method for property assignment parsing**
-
-This is a **new code path** in `ProcessStatements`. Property assignments like `n.DtoSuffix = "Dto"` are `AssignmentExpressionSyntax`, NOT `InvocationExpressionSyntax`. Add a third case branch:
+Property assignments like `n.DtoSuffix = "Dto"` are `AssignmentExpressionSyntax`, NOT `InvocationExpressionSyntax`. Add a new branch in `ProcessStatements`:
 
 ```csharp
-private static void ProcessStatements(SyntaxList<StatementSyntax> statements, ParseContext context)
-{
-    foreach (var statement in statements)
-    {
-        switch (statement)
-        {
-            case LocalDeclarationStatementSyntax localDecl:
-                ProcessLocalDeclaration(localDecl, context);
-                break;
-
-            case ExpressionStatementSyntax exprStmt when exprStmt.Expression is InvocationExpressionSyntax inv:
-                ProcessTopLevelInvocation(inv, context);
-                break;
-
-            // NEW: Handle property assignments (n.DtoSuffix = "Dto", c.RootPropertyName = "result")
-            case ExpressionStatementSyntax exprStmt when exprStmt.Expression is AssignmentExpressionSyntax assignment:
-                ProcessAssignment(assignment, context);
-                break;
-        }
-    }
-}
+case ExpressionStatementSyntax exprStmt when exprStmt.Expression is AssignmentExpressionSyntax assignment:
+    ProcessAssignment(assignment, context);
+    break;
 ```
 
-New `ProcessAssignment` method:
+`ProcessAssignment` implementation:
+- Extract receiver name from left-hand `MemberAccessExpressionSyntax`
+- Look up receiver kind in `ReceiverMap`
+- If `ReceiverKind.NamingBuilder`: extract property name and value
+  - For string properties (`DtoPrefix`, `DtoSuffix`, `ContainerSuffix`): extract via `LiteralExpressionSyntax.Token.ValueText`
+  - For boolean (`EmitJsonPropertyNames`): check `assignment.Right.IsKind(SyntaxKind.TrueLiteralExpression)` vs `SyntaxKind.FalseLiteralExpression`
+  - If RHS is not a literal: silently ignore (defensive)
+- Store in global or graph fields based on `context.IsParsingGraphNaming`
+
+**Step 6: Add UseNaming handler in AnalyzeInvocation**
 
 ```csharp
-private static void ProcessAssignment(AssignmentExpressionSyntax assignment, ParseContext context)
-{
-    // Left side: n.DtoSuffix (MemberAccessExpression)
-    if (assignment.Left is not MemberAccessExpressionSyntax memberAccess)
-        return;
+case "UseNaming" when receiverKind == ReceiverKind.NormalizeBuilder:
+    ProcessUseNamingLambda(invocation, context, isGraph: false);
+    return ReceiverKind.NormalizeBuilder;
 
-    var receiverName = memberAccess.Expression switch
-    {
-        IdentifierNameSyntax id => id.Identifier.Text,
-        _ => null,
-    };
-    if (receiverName is null || !context.ReceiverMap.TryGetValue(receiverName, out var receiverKind))
-        return;
-
-    var propertyName = memberAccess.Name.Identifier.Text;
-
-    switch (receiverKind)
-    {
-        case ReceiverKind.NamingBuilder:
-            ProcessNamingAssignment(propertyName, assignment.Right, context, isGraph: /* determined by tracking */);
-            break;
-        case ReceiverKind.JsonContractBuilder:
-            if (propertyName == "RootPropertyName" && assignment.Right is LiteralExpressionSyntax rootLiteral)
-                context.RootPropertyName = rootLiteral.Token.ValueText;
-            break;
-    }
-}
+case "UseNaming" when receiverKind == ReceiverKind.GraphBuilder:
+    ProcessUseNamingLambda(invocation, context, isGraph: true);
+    return ReceiverKind.GraphBuilder;
 ```
 
-For string literals: extract via `LiteralExpressionSyntax.Token.ValueText`.
-For boolean literals: check `assignment.Right.IsKind(SyntaxKind.TrueLiteralExpression)` or `SyntaxKind.FalseLiteralExpression`.
+`ProcessUseNamingLambda`:
+- Extract lambda parameter name
+- Register in `ReceiverMap` as `ReceiverKind.NamingBuilder`
+- Set `context.IsParsingGraphNaming = isGraph`
+- Call `ProcessStatements` on lambda body
+- Reset `context.IsParsingGraphNaming = false`
 
-> **Important:** Track whether the NamingBuilder lambda is for global or graph-level via a flag on ParseContext (e.g., `IsParsingGraphNaming`), or use separate receiver kind values (`NamingBuilderGlobal` vs `NamingBuilderGraph`).
+**Step 7: Wire NamingModel merge into returned NormalizationModel**
 
-**Step 6: Add case handlers in AnalyzeInvocation for method calls**
-
-Handle:
-- `"UseNaming"` on `NormalizeBuilder` → extract lambda param, register as `NamingBuilder`, process lambda body
-- `"UseNaming"` on `GraphBuilder` → same but sets graph-level overrides
-- `"UseJsonContract"` on `GraphBuilder` → extract lambda param, register as `JsonContractBuilder`, process lambda body
-- `"Collection"` on `JsonContractBuilder` → extract type arg FQN + string arg → store in `CollectionJsonNames`
-
-**Step 7: Handle Reference().JsonName() cross-type chaining**
-
-The existing `GetUltimateReceiverName` always resolves to the root receiver (`x` = TypeBuilder), which cannot work for cross-type chains like `x.Reference(p => p.Line).JsonName("line")`.
-
-Solution: Use the return value from the inner `AnalyzeInvocation` call. The inner call processes `Reference(p => p.Line)`, extracts the property name, stores it in `context.CurrentReferencePropertyKey`, and returns `ReceiverKind.ReferenceBuilder`. Then in `AnalyzeInvocation`, when the outer call's immediate receiver is an invocation (line 104-110), use the returned `ReceiverKind` instead of looking up `GetUltimateReceiverName`:
-
-```csharp
-// At the top of AnalyzeInvocation, before the existing receiverName lookup:
-if (invocation.Expression is MemberAccessExpressionSyntax outerAccess
-    && outerAccess.Expression is InvocationExpressionSyntax innerInvocation)
-{
-    var innerResult = AnalyzeInvocation(innerInvocation, context);
-    if (innerResult is not null)
-    {
-        // The inner call returned a receiver kind -- use it for the outer method
-        var outerMethodName = GetMethodName(outerAccess);
-        if (outerMethodName == "JsonName" && innerResult == ReceiverKind.ReferenceBuilder)
-        {
-            ProcessJsonNameOnReference(invocation, context);
-            return ReceiverKind.ReferenceBuilder;
-        }
-    }
-}
-```
-
-Where `ProcessJsonNameOnReference` extracts the string argument and stores it with the key from `context.CurrentReferencePropertyKey`.
-
-**Step 8: Wire PropertyJsonNames to NormalizationModel**
-
-Add to `NormalizationModel`:
-
-```csharp
-public ImmutableDictionary<string, string> PropertyJsonNameOverrides { get; init; } =
-    ImmutableDictionary<string, string>.Empty;
-```
-
-In `Parse()`, transfer from context:
-
-```csharp
-PropertyJsonNameOverrides = context.PropertyJsonNames.ToImmutableDictionary(),
-```
-
-Task 4 (TypeGraphAnalyzer) will merge these into `AnalyzedProperty.JsonNameOverride`.
-
-**Step 9: Wire NamingModel merge into returned NormalizationModel**
-
-At the end of `Parse()`, merge global + graph naming:
+At the end of `Parse()`:
 
 ```csharp
 Naming = new NamingModel
@@ -440,135 +255,59 @@ Naming = new NamingModel
     ContainerSuffix = context.GraphContainerSuffix ?? context.GlobalContainerSuffix,
     EmitJsonPropertyNames = context.GraphEmitJsonPropertyNames ?? context.GlobalEmitJsonPropertyNames,
 },
-JsonContract = new JsonContractModel
-{
-    RootPropertyName = context.RootPropertyName,
-    CollectionJsonNames = context.CollectionJsonNames.ToImmutableDictionary(),
-},
-PropertyJsonNameOverrides = context.PropertyJsonNames.ToImmutableDictionary(),
 ```
 
-**Step 10: Write and run tests for UseJsonContract parsing**
+**Step 8: Also bridge `UseJsonNaming(CamelCase)` to `EmitJsonPropertyNames = true`**
 
-Tests to write:
-- `graph.UseJsonContract(c => { c.Collection<SearchLine>("lines"); })` → `CollectionJsonNames` contains `SearchLine FQN → "lines"`
-- `graph.UseJsonContract(c => { c.RootPropertyName = "result"; })` → `RootPropertyName == "result"`
-- Multiple `Collection<T>()` calls in one lambda → all stored
-- `RootPropertyName` with empty string → stored as empty string (not null)
+When parsing `UseJsonNaming`, also set `context.GlobalEmitJsonPropertyNames = true`.
 
-**Step 11: Write and run tests for Reference().JsonName() parsing**
+**Step 9: Run tests to verify they pass**
 
-Tests to write:
-- `x.Reference(p => p.Line).JsonName("line")` → `PropertyJsonNameOverrides` contains `"TypeFqn.Line" → "line"`
-- `x.ReferenceCollection(p => p.Items).JsonName("items")` → same pattern
-- Multiple `Reference().JsonName()` calls on the same TypeBuilder → all stored correctly
-- `x.Reference(p => p.Line)` without `.JsonName()` → no entry in `PropertyJsonNames`, no crash
+**Step 10: Write and run tests for merge semantics**
 
-**Step 12: Write and run tests for merge semantics**
-
-Tests to write:
-- Global `UseNaming(n => { n.DtoSuffix = "Model"; })` + graph `UseNaming(n => { n.ContainerSuffix = "Container"; })` → final model has `DtoSuffix = "Model"` AND `ContainerSuffix = "Container"` (merge, not replace)
+Tests:
+- Global `DtoSuffix = "Model"` + graph `ContainerSuffix = "Container"` → final has both
 - Global only → all global values apply
-- Graph overrides all properties → global fully overridden
-- No `UseNaming` on either → `NamingModel.Default` values
+- Graph overrides everything → global fully overridden
+- No UseNaming → `NamingModel.Default`
 
-**Step 13: Write and run tests for edge cases**
-
-Tests to write:
-- Assignment with non-literal RHS (e.g., `n.DtoSuffix = someVariable`) → silently ignored, default preserved
-- `EmitJsonPropertyNames = false` → boolean false parsed correctly
-- `UseNaming` called twice on same builder → last wins
-- Mixed assignments + method calls in same lambda body
-
-**Step 14: Also parse `UseJsonNaming(CamelCase)` as `EmitJsonPropertyNames = true`**
-
-When the parser encounters `UseJsonNaming`, in addition to setting `context.JsonNamingPolicy = "CamelCase"`, also set `context.GlobalEmitJsonPropertyNames = true`. This ensures a seamless transition for any code using the old API.
-
-**Step 12: Commit**
+**Step 11: Commit**
 
 ```
-feat: extend ConfigurationParser to parse UseNaming, UseJsonContract, and Reference().JsonName()
+feat: extend ConfigurationParser to parse UseNaming() with property assignment support
 ```
 
 ---
 
-### Task 4: Extend TypeGraphAnalyzer to read [NormalizeJsonName] attributes
-
-**Files:**
-- Modify: `src/DataNormalizer.Generators/Analysis/TypeGraphAnalyzer.cs`
-- Test: `tests/DataNormalizer.Generators.Tests/Analysis/TypeGraphAnalyzerTests.cs`
-
-**Step 1: Write failing test**
-
-Add a test that creates a source type with `[NormalizeJsonName("line")]` on a property and verifies the analyzer sets `JsonNameOverride` on the corresponding `AnalyzedProperty`.
-
-**Step 2: Run test to verify it fails**
-
-**Step 3: In TypeGraphAnalyzer, when building AnalyzedProperty, check for the NormalizeJsonName attribute**
-
-Look for `NormalizeJsonNameAttribute` on the property symbol. If found, extract the string constructor argument and set `JsonNameOverride`.
-
-Also check `model.PropertyJsonNameOverrides` (from the config parser). Config overrides take precedence over attributes:
-
-```csharp
-var jsonNameOverride = (string?)null;
-// Check config-based override first (higher priority)
-var propKey = $"{typeSymbol.ToDisplayString()}.{propertySymbol.Name}";
-if (model.PropertyJsonNameOverrides.TryGetValue(propKey, out var configOverride))
-    jsonNameOverride = configOverride;
-// Fall back to attribute
-else if (/* property has NormalizeJsonNameAttribute */)
-    jsonNameOverride = /* extracted value */;
-```
-
-**Step 4: Write tests for priority resolution**
-
-Tests to write:
-- Property has `[NormalizeJsonName("x")]` AND config has `Reference().JsonName("y")` for same property → `JsonNameOverride == "y"` (config wins)
-- Property has `[NormalizeJsonName("x")]` only → `JsonNameOverride == "x"` (attribute used)
-- Property has neither → `JsonNameOverride == null`
-- Property has config override only (no attribute) → config value used
-
-**Step 5: Run tests to verify they pass**
-
-**Step 5: Commit**
-
-```
-feat: read [NormalizeJsonName] attribute in TypeGraphAnalyzer
-```
-
----
-
-### Task 5: Update EmitterHelpers with naming-aware methods
+### Task 4: Update EmitterHelpers with naming-aware methods
 
 **Files:**
 - Modify: `src/DataNormalizer.Generators/Emitters/EmitterHelpers.cs`
-- Test: `tests/DataNormalizer.Generators.Tests/Emitters/` (new tests in existing files or new file)
+- Create: `tests/DataNormalizer.Generators.Tests/Emitters/EmitterHelpersTests.cs`
 
-**Step 1: Write failing tests for new naming methods**
+**Step 1: Write failing tests**
 
-Test that:
-- `GetDtoName("Person", namingModel)` returns `"PersonDto"` with defaults
-- `GetDtoName("Person", new NamingModel { DtoPrefix = "Normalized", DtoSuffix = "" })` returns `"NormalizedPerson"`
-- `GetDtoName("Address", namingModel)` returns `"AddressDto"` (not `"AddresDto"`)
-- `GetContainerName("Person", namingModel)` returns `"PersonResultDto"` with defaults
-- `GetContainerName("Person", new NamingModel { ContainerSuffix = "" })` returns `"PersonResult"`
-- `GetContainerFullName("TestApp.Person", "Person", namingModel)` returns `"TestApp.PersonResultDto"`
-- `GetListPropertyName(node, allNodes, namingModel)` returns `"PersonDtos"` with defaults
-- `GetListPropertyName(node, allNodes, new NamingModel { DtoSuffix = "" })` returns `"PersonList"` (fallback)
-- `GetListPropertyName(node, allNodes, new NamingModel { DtoSuffix = "Entity" })` returns `"PersonEntities"` (uses `ToPlural`)
-- `GetListPropertyName` with two nodes having the same `TypeName` but different namespaces → namespace prefix applied
-- `GetListPropertyName(addressNode, allNodes, namingModel)` returns `"AddressDtos"` (verify pluralization of "Address" + "Dto")
+Tests:
+- `GetDtoName("Person", default)` → `"PersonDto"`
+- `GetDtoName("Person", prefix="Normalized", suffix="")` → `"NormalizedPerson"`
+- `GetDtoName("Address", default)` → `"AddressDto"`
+- `GetContainerName("Person", default)` → `"PersonResultDto"`
+- `GetContainerName("Person", containerSuffix="")` → `"PersonResult"`
+- `GetDtoFullName("TestApp.Person", "Person", default)` → `"TestApp.PersonDto"`
+- `GetContainerFullName("TestApp.Person", "Person", default)` → `"TestApp.PersonResultDto"`
+- `GetListPropertyName(node, allNodes, default)` → `"PersonDtos"`
+- `GetListPropertyName(node, allNodes, suffix="")` → `"PersonList"` (fallback)
+- `GetListPropertyName(node, allNodes, suffix="Entity")` → `"PersonEntities"` (ToPlural)
+- `GetListPropertyName` with duplicate TypeNames → namespace prefix applied
+- `GetListPropertyName(addressNode, allNodes, default)` → `"AddressDtos"`
 
 **Step 2: Run to verify failure**
 
-**Step 3: Implement new naming methods**
+**Step 3: Implement**
 
 ```csharp
 public static string GetDtoName(string typeName, NamingModel naming)
-{
-    return $"{naming.DtoPrefix}{typeName}{naming.DtoSuffix}";
-}
+    => $"{naming.DtoPrefix}{typeName}{naming.DtoSuffix}";
 
 public static string GetDtoFullName(string typeFullName, string typeName, NamingModel naming)
 {
@@ -578,9 +317,7 @@ public static string GetDtoFullName(string typeFullName, string typeName, Naming
 }
 
 public static string GetContainerName(string typeName, NamingModel naming)
-{
-    return $"{typeName}Result{naming.ContainerSuffix}";
-}
+    => $"{typeName}Result{naming.ContainerSuffix}";
 
 public static string GetContainerFullName(string typeFullName, string typeName, NamingModel naming)
 {
@@ -591,33 +328,24 @@ public static string GetContainerFullName(string typeFullName, string typeName, 
 
 public static string GetListPropertyName(TypeGraphNode node, IReadOnlyList<TypeGraphNode> allNodes, NamingModel naming)
 {
+    var baseName = node.TypeName;
     var count = 0;
     for (var i = 0; i < allNodes.Count; i++)
-    {
-        if (allNodes[i].TypeName == node.TypeName)
-            count++;
-    }
-
-    var baseName = node.TypeName;
+        if (allNodes[i].TypeName == node.TypeName) count++;
     if (count > 1)
     {
         var ns = GetNamespace(node.TypeFullName);
-        if (!string.IsNullOrEmpty(ns))
-            baseName = ns.Replace(".", "") + baseName;
+        if (!string.IsNullOrEmpty(ns)) baseName = ns.Replace(".", "") + baseName;
     }
 
-    // When DtoSuffix is empty, fall back to "{TypeName}List" convention
     if (string.IsNullOrEmpty(naming.DtoSuffix))
         return $"{baseName}List";
 
-    // Use ToPlural to handle suffixes correctly (e.g., "Entity" -> "Entities")
     return ToPlural($"{baseName}{naming.DtoSuffix}");
 }
 ```
 
-**Step 4: Run tests to verify they pass**
-
-**Step 5: Commit**
+**Step 4: Run tests, commit**
 
 ```
 feat: add naming-aware helper methods to EmitterHelpers
@@ -625,142 +353,124 @@ feat: add naming-aware helper methods to EmitterHelpers
 
 ---
 
-### Task 6: Update DtoEmitter to use NamingModel
+### Task 5: Update DtoEmitter to use NamingModel
 
 **Files:**
 - Modify: `src/DataNormalizer.Generators/Emitters/DtoEmitter.cs`
 - Modify: `tests/DataNormalizer.Generators.Tests/Emitters/DtoEmitterTests.cs`
 
-**Step 1: Update all existing DtoEmitter tests for new defaults**
+**Step 1: Update existing tests for new defaults**
 
-Change all assertions from `NormalizedPerson` to `PersonDto`. Update `DtoEmitter.Emit()` calls to pass a `NamingModel`. Tests that assert `Does.Not.Contain("JsonPropertyName")` when passing `jsonNamingPolicy: null` must be updated to pass `new NamingModel { EmitJsonPropertyNames = false }` instead (or reverse the assertion, since default is now `true`).
+- Change `NormalizedPerson` → `PersonDto` in all assertions
+- Update `Emit()` calls to pass `NamingModel`
+- Tests asserting `Does.Not.Contain("JsonPropertyName")` with `jsonNamingPolicy: null` → pass `new NamingModel { EmitJsonPropertyNames = false }` or reverse assertion
 
 **Step 2: Run tests to verify they fail**
 
-**Step 3: Change DtoEmitter.Emit signature to accept NamingModel**
+**Step 3: Change DtoEmitter.Emit signature**
 
 ```csharp
 public static string Emit(TypeGraphNode node, bool copySourceAttributes, NamingModel naming)
 ```
 
-Replace:
-- `$"Normalized{node.TypeName}"` with `EmitterHelpers.GetDtoName(node.TypeName, naming)`
+- Replace `$"Normalized{node.TypeName}"` with `EmitterHelpers.GetDtoName(node.TypeName, naming)`
+- Replace `jsonNamingPolicy` check with `naming.EmitJsonPropertyNames`
+- When `EmitJsonPropertyNames` is true: always emit `[JsonPropertyName]` with camelCase
 
-**Step 4: Update EmitJsonNamingAttribute to use NamingModel**
+**Step 4: Run tests to verify they pass**
 
-Replace the `jsonNamingPolicy` string parameter approach:
-- If `naming.EmitJsonPropertyNames` → always emit `[JsonPropertyName]`
-- Check `prop.JsonNameOverride` first; if set, use it directly
-- Otherwise camelCase the CLR property name
+**Step 5: Write new tests**
 
-**Step 5: Run tests to verify they pass**
+- `EmitJsonPropertyNames = true` → all properties have `[JsonPropertyName("camelCase")]`
+- `EmitJsonPropertyNames = false` → no `[JsonPropertyName]` attributes
+- Custom prefix/suffix: `DtoPrefix = "My", DtoSuffix = ""` → class named `MyPerson`
 
-**Step 6: Write new tests for JsonNameOverride**
-
-**Step 7: Commit**
+**Step 6: Commit**
 
 ```
-feat: update DtoEmitter to use NamingModel for type and property names
+feat: update DtoEmitter to use NamingModel
 ```
 
 ---
 
-### Task 7: Update ContainerEmitter to use NamingModel and JsonContractModel
+### Task 6: Update ContainerEmitter to use NamingModel
 
 **Files:**
 - Modify: `src/DataNormalizer.Generators/Emitters/ContainerEmitter.cs`
 - Modify: `tests/DataNormalizer.Generators.Tests/Emitters/ContainerEmitterTests.cs`
 
-**Step 1: Update existing ContainerEmitter tests for new defaults**
+**Step 1: Update existing tests for new defaults**
 
-Change assertions from `NormalizedPersonResult` to `PersonResultDto`, from `PersonList` to `PersonDtos`. Update tests that assert no `[JsonPropertyName]` when `jsonNamingPolicy: null` to use `new NamingModel { EmitJsonPropertyNames = false }`.
+- `NormalizedPersonResult` → `PersonResultDto`
+- `PersonList` → `PersonDtos`
+- Update tests that assert no `[JsonPropertyName]` → use `new NamingModel { EmitJsonPropertyNames = false }`
 
 **Step 2: Run tests to verify they fail**
 
 **Step 3: Change ContainerEmitter.Emit signature**
 
 ```csharp
-public static string Emit(
-    TypeGraphNode rootNode,
-    IReadOnlyList<TypeGraphNode> allNodes,
-    NamingModel naming,
-    JsonContractModel jsonContract)
+public static string Emit(TypeGraphNode rootNode, IReadOnlyList<TypeGraphNode> allNodes, NamingModel naming)
 ```
 
-Replace:
-- Container class name: use `EmitterHelpers.GetContainerName(rootNode.TypeName, naming)`
-- DTO full names: use `EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName, naming)`
-- List property names (CLR): use `EmitterHelpers.GetListPropertyName(node, allNodes, naming)`
-- JSON property names on lists: check `jsonContract.CollectionJsonNames[node.TypeFullName]` first, then camelCase the CLR property name
-- Root property: if `jsonContract.RootPropertyName` is set, emit a root DTO property with that JSON name
+- Container class name: `EmitterHelpers.GetContainerName(rootNode.TypeName, naming)`
+- DTO full names: `EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName, naming)`
+- List property names: `EmitterHelpers.GetListPropertyName(node, allNodes, naming)`
+- JSON names: if `naming.EmitJsonPropertyNames`, camelCase the CLR list property name
 
-**Step 4-7: Run tests, write new tests for JsonContractModel, commit**
+**Step 4: Run tests, write additional tests, commit**
 
 ```
-feat: update ContainerEmitter to use NamingModel and JsonContractModel
+feat: update ContainerEmitter to use NamingModel
 ```
 
 ---
 
-### Task 8: Update NormalizerEmitter to use NamingModel and JsonContractModel
+### Task 7: Update NormalizerEmitter to use NamingModel
 
 **Files:**
 - Modify: `src/DataNormalizer.Generators/Emitters/NormalizerEmitter.cs`
 - Modify: `tests/DataNormalizer.Generators.Tests/Emitters/NormalizerEmitterTests.cs`
 
-**Step 1: Update existing NormalizerEmitter tests for new defaults**
-
-Change assertions from `NormalizedPersonResult` to `PersonResultDto`, `PersonList` to `PersonDtos`.
+**Step 1: Update tests** (`NormalizedPersonResult` → `PersonResultDto`, `PersonList` → `PersonDtos`)
 
 **Step 2: Run tests to verify they fail**
 
-**Step 3: Update NormalizerEmitter to use NamingModel**
+**Step 3: Update NormalizerEmitter**
 
-Specific changes (the `model` parameter already provides `model.Naming`):
-- Line 75: `EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName)` → pass `model.Naming`
-- Line 87: `EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName)` → pass `model.Naming`
-- Line 95: `result.{node.TypeName}List` → use `EmitterHelpers.GetListPropertyName(node, allNodes, model.Naming)`
-- Line 106: `EmitterHelpers.GetDtoFullName(node.TypeFullName, typeName)` → pass `model.Naming`
+Access naming via `model.Naming`:
+- Line 75: `GetContainerFullName` → pass `model.Naming`
+- Line 87: `GetDtoFullName` → pass `model.Naming`
+- Line 95: `result.{node.TypeName}List` → `result.{GetListPropertyName(node, allNodes, model.Naming)}`
+- Line 106: `GetDtoFullName` → pass `model.Naming`
 
-> **Important:** Do NOT change `Normalize{typeName}` helper method names (lines 80, 109, etc.). These are internal method names, not type names.
+> Do NOT change `Normalize{typeName}` helper method names -- these are internal method names.
 
-**Step 4: Add root property population**
-
-If `model.JsonContract.RootPropertyName` is set, after populating all list properties, emit:
-
-```csharp
-result.Root = __{rootCamel}Arr[0];
-```
-
-This requires NormalizerEmitter to also consult `model.JsonContract`.
-
-**Step 5: Run tests, commit**
+**Step 4: Run tests, commit**
 
 ```
-feat: update NormalizerEmitter to use NamingModel and JsonContractModel
+feat: update NormalizerEmitter to use NamingModel
 ```
 
 ---
 
-### Task 9: Update DenormalizerEmitter to use NamingModel
+### Task 8: Update DenormalizerEmitter to use NamingModel
 
 **Files:**
 - Modify: `src/DataNormalizer.Generators/Emitters/DenormalizerEmitter.cs`
 - Modify: `tests/DataNormalizer.Generators.Tests/Emitters/DenormalizerEmitterTests.cs`
 
-**Step 1: Update existing tests for new defaults**
+**Step 1: Update tests**
 
 **Step 2: Run tests to verify they fail**
 
-**Step 3: Update DenormalizerEmitter to use NamingModel**
+**Step 3: Update DenormalizerEmitter**
 
-Two specific changes:
-- Line 63: `EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName)` → pass `model.Naming`
-- Line 91: `normalized.{node.TypeName}List` → use `EmitterHelpers.GetListPropertyName(node, allNodes, model.Naming)`
+Two changes via `model.Naming`:
+- Line 63: `GetContainerFullName` → pass `model.Naming`
+- Line 91: `normalized.{node.TypeName}List` → `normalized.{GetListPropertyName(node, allNodes, model.Naming)}`
 
-> **Note:** DenormalizerEmitter reconstructs source types, not DTO types, so DTO naming changes do not affect most of its output.
-
-Thread `NamingModel` (from `model.Naming`) through the private method chain: `Emit` → `EmitDenormalizeMethod` → `EmitGetCollections`. `EmitGetCollections` already receives `allNodes` but needs `naming` added.
+Thread `NamingModel` through: `Emit` → `EmitDenormalizeMethod` → `EmitGetCollections`. Add `NamingModel naming` parameter to private methods that need it.
 
 **Step 4: Run tests, commit**
 
@@ -770,212 +480,32 @@ feat: update DenormalizerEmitter to use NamingModel
 
 ---
 
-### Task 10: Wire everything through NormalizeGenerator
+### Task 9: Wire through NormalizeGenerator and update hint names
 
 **Files:**
 - Modify: `src/DataNormalizer.Generators/NormalizeGenerator.cs`
 
 **Step 1: Update emitter calls**
 
-- Line 124: `DtoEmitter.Emit(node, model.CopySourceAttributes, model.Naming)` (remove old `model.JsonNamingPolicy` parameter)
-- `ContainerEmitter.Emit(rootNode, nodes, model.Naming, model.JsonContract)`
-- NormalizerEmitter and DenormalizerEmitter already receive `model`, so they access `model.Naming` and `model.JsonContract` internally.
+- `DtoEmitter.Emit(node, model.CopySourceAttributes, model.Naming)` (was `model.JsonNamingPolicy`)
+- `ContainerEmitter.Emit(rootNode, nodes, model.Naming)` (was `jsonNamingPolicy`)
+- NormalizerEmitter/DenormalizerEmitter already receive `model`
 
 **Step 2: Update hint name generation**
 
-Lines 129-130 and 158-159 hardcode `Normalized{TypeName}` in hint names. Update to:
-- `$"{EmitterHelpers.GetDtoName(node.TypeName, model.Naming)}.g.cs"` for DTO hint names
-- `$"{EmitterHelpers.GetContainerName(rootNode.TypeName, model.Naming)}.g.cs"` for container hint names
+Lines 129-130, 158-159: replace `Normalized{TypeName}` with:
+- `EmitterHelpers.GetDtoName(node.TypeName, model.Naming)` for DTO hints
+- `EmitterHelpers.GetContainerName(rootNode.TypeName, model.Naming)` for container hints
 
 **Step 3: Run all generator tests, commit**
 
 ```
-feat: wire NamingModel and JsonContractModel through NormalizeGenerator to all emitters
+feat: wire NamingModel through NormalizeGenerator
 ```
 
 ---
 
-### Task 11: Update integration tests and E2E tests for new defaults
-
-**Files to update (ALL of these):**
-- `tests/DataNormalizer.Integration.Tests/SimpleNormalizationTests.cs`
-- `tests/DataNormalizer.Integration.Tests/BasicRoundtripTests.cs`
-- `tests/DataNormalizer.Integration.Tests/ConfigFeatureTests.cs`
-- `tests/DataNormalizer.Integration.Tests/CircularReferenceTests.cs`
-- `tests/DataNormalizer.Integration.Tests/DeepNestingTests.cs`
-- `tests/DataNormalizer.Integration.Tests/PerformanceTests.cs`
-- `tests/DataNormalizer.Integration.Tests/SmokeTests.cs`
-- `tests/DataNormalizer.Generators.Tests/GeneratorEndToEndTests.cs`
-
-**Step 1: Systematic renames across all files**
-
-Type name renames:
-- `NormalizedPerson` → `PersonDto`
-- `NormalizedAddress` → `AddressDto`
-- `NormalizedPhoneNumber` → `PhoneNumberDto`
-- `NormalizedOrder` → `OrderDto`
-- `NormalizedPersonResult` → `PersonResultDto`
-- `NormalizedOrderResult` → `OrderResultDto`
-- (and all other `Normalized{X}` → `{X}Dto`)
-
-List property renames:
-- `PersonList` → `PersonDtos`
-- `AddressList` → `AddressDtos`
-- `PhoneNumberList` → `PhoneNumberDtos`
-- `OrderList` → `OrderDtos`
-- `EmployeeList` → `EmployeeDtos`
-- `TreeNodeList` → `TreeNodeDtos`
-- `NodeAList` → `NodeADtos`
-- `UniverseList` → `UniverseDtos`
-- `GalaxyList` → `GalaxyDtos`
-- `SolarSystemList` → `SolarSystemDtos`
-- `PlanetList` → `PlanetDtos`
-- `ContinentList` → `ContinentDtos`
-- `CountryList` → `CountryDtos`
-- `CityList` → `CityDtos`
-- (and all other `{X}List` → `{X}Dtos`)
-
-**Step 2: Update E2E hint name searches**
-
-In `GeneratorEndToEndTests.cs`:
-- `s.hintName.Contains("NormalizedPersonResult")` → `"PersonResultDto"`
-- `s.hintName.Contains("NormalizedOrderResult")` → `"OrderResultDto"`
-- `s.hintName.Contains("NormalizedAddress")` → `"AddressDto"`
-- Update all string-matched assertions in `E2E_MultipleRoots_ContainersOnlyHaveReachableEntityLists`
-
-**Step 3: Verify Tasks 8-9 updated hardcoded names**
-
-Before running tests, confirm:
-- `NormalizerEmitter.EmitPublicNormalizeMethod()` (line 95) uses naming-aware list property name
-- `DenormalizerEmitter.EmitGetCollections()` (line 91) uses naming-aware list property name
-
-**Step 4: Run all tests, commit**
-
-```
-test: update all integration and E2E tests for new naming defaults
-```
-
----
-
-### Task 12: Update samples for new defaults
-
-**Files:**
-- Modify: `samples/DataNormalizer.Samples/Program.cs`
-- Modify: `samples/DataNormalizer.Samples/SampleNormalization.cs`
-- Modify: `samples/DataNormalizer.Samples/CorporateNormalization.cs`
-
-**Step 1: Rename all generated types and list properties**
-
-Type renames: `NormalizedOrder` → `OrderDto`, `NormalizedOrderResult` → `OrderResultDto`, etc.
-
-List property renames (18 references in `Program.cs`):
-- `OrderList` → `OrderDtos`
-- `CustomerList` → `CustomerDtos`
-- `AddressList` → `AddressDtos`
-- `OrderLineList` → `OrderLineDtos`
-- `ProductList` → `ProductDtos`
-- `CorporationList` → `CorporationDtos`
-- `DivisionList` → `DivisionDtos`
-- `DepartmentList` → `DepartmentDtos`
-- `TeamList` → `TeamDtos`
-- `EmployeeList` → `EmployeeDtos`
-- `CertificationList` → `CertificationDtos`
-- `SkillList` → `SkillDtos`
-
-**Step 2: Build and verify, commit**
-
-```
-chore: update samples for new naming defaults
-```
-
----
-
-### Task 13: Add integration tests with custom naming, JsonContract, and default JSON roundtrip
-
-**Files:**
-- Create: `tests/DataNormalizer.Integration.Tests/TestTypes/Naming/` (new test types)
-- Create: `tests/DataNormalizer.Integration.Tests/CustomNamingConfig.cs`
-- Create: `tests/DataNormalizer.Integration.Tests/NamingPolicyTests.cs`
-
-**Step 1: Create test types inspired by the search-response use case**
-
-Create types in `TestTypes/Naming/` namespace to avoid collision with existing cycle test types:
-- `SearchResponse` (root) with routes, places, carriers references
-- `SearchRoute` with segments
-- `SearchSegment` with options
-- `SearchHop` with line, carrier, vehicle references
-- `SearchLine` with places
-- `SearchPlace`, `SearchCarrier`, `SearchVehicle`
-
-These mirror the structure from the ChatGPT discussion's transport search example.
-
-**Step 2: Create CustomNamingConfig**
-
-```csharp
-[NormalizeConfiguration]
-public partial class CustomNamingConfig : NormalizationConfig
-{
-    protected override void Configure(NormalizeBuilder builder)
-    {
-        builder.NormalizeGraph<SearchResponse>(graph =>
-        {
-            graph.UseJsonContract(c =>
-            {
-                c.RootPropertyName = "result";
-                c.Collection<SearchRoute>("routes");
-                c.Collection<SearchLine>("lines");
-                c.Collection<SearchPlace>("places");
-                c.Collection<SearchCarrier>("carriers");
-            });
-        });
-
-        builder.ForType<SearchHop>(x =>
-        {
-            x.Reference(p => p.Line).JsonName("line");
-            x.Reference(p => p.Carrier).JsonName("carrier");
-        });
-    }
-}
-```
-
-**Step 3: Write roundtrip + JSON serialization tests**
-
-- Normalize a SearchResponse graph
-- Serialize to JSON with `System.Text.Json.JsonSerializer`
-- Verify JSON contains expected property names (`"routes"`, `"lines"`, `"line"`, `"carrier"`)
-- Denormalize and verify roundtrip
-
-**Step 4: Write default naming JSON roundtrip test**
-
-Using the basic Person/Address graph:
-- Normalize, serialize to JSON
-- Verify default JSON property names are camelCase (`"personDtos"`, `"addressDtos"`, `"homeAddressIndex"`)
-
-**Step 5: Write test for [NormalizeJsonName] attribute**
-
-Add `[NormalizeJsonName("addr")]` on a property in one of the test types, verify it appears in serialized JSON.
-
-**Step 6: Write test for PropertyJsonNameOverrides end-to-end flow**
-
-This tests the full chain: parser produces `PropertyJsonNames` → wired to `NormalizationModel.PropertyJsonNameOverrides` → consumed by `TypeGraphAnalyzer` → sets `AnalyzedProperty.JsonNameOverride` → consumed by `DtoEmitter` → emits `[JsonPropertyName("line")]`.
-
-Use the `CustomNamingConfig` which has `x.Reference(p => p.Line).JsonName("line")`. Normalize a SearchResponse, serialize to JSON, and verify the property is named `"line"` (not `"lineIndex"`).
-
-**Step 7: Write negative/edge case tests**
-
-- `UseJsonContract` referencing a type that's `Inline<T>` → type is inlined, Collection entry is ignored (or produces diagnostic)
-- `UseNaming` called twice → last wins (consistent with Task 3 tests, but verify at integration level)
-- Config with no `UseNaming` → defaults apply (`PersonDto`, `PersonDtos`, `[JsonPropertyName]` on all props)
-
-**Step 8: Run tests, commit**
-
-```
-test: add integration tests for custom naming policy, JSON contract, and default JSON roundtrip
-```
-
----
-
-### Task 14: Clean up old naming code paths
+### Task 10: Clean up old naming code paths
 
 **Files:**
 - Modify: `src/DataNormalizer.Generators/Emitters/EmitterHelpers.cs`
@@ -984,18 +514,16 @@ test: add integration tests for custom naming policy, JSON contract, and default
 - Modify: `src/DataNormalizer.Generators/Models/NormalizationModel.cs`
 - Modify: `src/DataNormalizer.Generators/Analysis/ConfigurationParser.cs`
 
-**Step 1: Remove old `JsonNamingPolicy` string field from NormalizationModel**
+**Step 1: Remove `JsonNamingPolicy` field from NormalizationModel** (superseded by `NamingModel.EmitJsonPropertyNames`)
 
-The field is superseded by `NamingModel.EmitJsonPropertyNames`. Task 3 already maps `UseJsonNaming(CamelCase)` to `EmitJsonPropertyNames = true`.
+**Step 2: Remove old method overloads without NamingModel parameter**
 
-**Step 2: Remove old overloads**
+- `EmitterHelpers.GetDtoFullName(string, string)` → removed
+- `EmitterHelpers.GetContainerFullName(string, string)` → removed
+- `EmitterHelpers.GetListPropertyName(TypeGraphNode, IReadOnlyList<TypeGraphNode>)` → removed
+- `DtoEmitter.Emit(TypeGraphNode node)` convenience overload → removed
 
-- `EmitterHelpers.GetDtoFullName(string, string)` (two-arg, no NamingModel)
-- `EmitterHelpers.GetContainerFullName(string, string)` (two-arg, no NamingModel)
-- `EmitterHelpers.GetListPropertyName(TypeGraphNode, IReadOnlyList<TypeGraphNode>)` (two-arg, no NamingModel)
-- `DtoEmitter.Emit(TypeGraphNode node)` (convenience overload)
-
-**Step 3: Remove `JsonNamingPolicy` from ParseContext and parser output**
+**Step 3: Remove `JsonNamingPolicy` from ParseContext**
 
 **Step 4: Run all tests, commit**
 
@@ -1005,13 +533,117 @@ refactor: remove old naming code paths replaced by NamingModel
 
 ---
 
-### Task 15: Run full build and format check
+### Task 11: Update ALL integration tests and E2E tests
 
-**Step 1:** `dotnet build --no-restore` -- verify 0 errors
-**Step 2:** `dotnet csharpier check .` -- verify all formatted
-**Step 3:** `dotnet test --no-restore` -- verify all pass
+**Files (ALL need updating):**
+- `tests/DataNormalizer.Integration.Tests/SimpleNormalizationTests.cs`
+- `tests/DataNormalizer.Integration.Tests/BasicRoundtripTests.cs`
+- `tests/DataNormalizer.Integration.Tests/ConfigFeatureTests.cs`
+- `tests/DataNormalizer.Integration.Tests/CircularReferenceTests.cs`
+- `tests/DataNormalizer.Integration.Tests/DeepNestingTests.cs`
+- `tests/DataNormalizer.Integration.Tests/PerformanceTests.cs`
+- `tests/DataNormalizer.Integration.Tests/SmokeTests.cs`
+- `tests/DataNormalizer.Generators.Tests/GeneratorEndToEndTests.cs`
+
+**Step 1: Type name renames across all files**
+
+`Normalized{X}` → `{X}Dto` for ALL types (Person, Address, PhoneNumber, Order, Employee, TreeNode, NodeA, Universe, Galaxy, SolarSystem, Planet, Continent, Country, City, etc.)
+
+**Step 2: List property renames across all files**
+
+`{X}List` → `{X}Dtos` for ALL types (PersonList→PersonDtos, AddressList→AddressDtos, PhoneNumberList→PhoneNumberDtos, OrderList→OrderDtos, EmployeeList→EmployeeDtos, TreeNodeList→TreeNodeDtos, NodeAList→NodeADtos, UniverseList→UniverseDtos, GalaxyList→GalaxyDtos, SolarSystemList→SolarSystemDtos, PlanetList→PlanetDtos, ContinentList→ContinentDtos, CountryList→CountryDtos, CityList→CityDtos)
+
+**Step 3: E2E hint name searches**
+
+Update `GeneratorEndToEndTests.cs`:
+- `"NormalizedPersonResult"` → `"PersonResultDto"`
+- `"NormalizedOrderResult"` → `"OrderResultDto"`
+- `"NormalizedAddress"` → `"AddressDto"`
+- String-matched assertions in `E2E_MultipleRoots_ContainersOnlyHaveReachableEntityLists`
+
+**Step 4: Verify Tasks 7-8 updated hardcoded names** (NormalizerEmitter line 95, DenormalizerEmitter line 91)
+
+**Step 5: Run all tests, commit**
+
+```
+test: update all integration and E2E tests for new naming defaults
+```
+
+---
+
+### Task 12: Update samples
+
+**Files:**
+- Modify: `samples/DataNormalizer.Samples/Program.cs`
+- Modify: `samples/DataNormalizer.Samples/SampleNormalization.cs`
+- Modify: `samples/DataNormalizer.Samples/CorporateNormalization.cs`
+
+**Step 1: Type and list property renames**
+
+Type: `NormalizedOrder`→`OrderDto`, `NormalizedOrderResult`→`OrderResultDto`, etc.
+
+List (18 refs in Program.cs): `OrderList`→`OrderDtos`, `CustomerList`→`CustomerDtos`, `AddressList`→`AddressDtos`, `OrderLineList`→`OrderLineDtos`, `ProductList`→`ProductDtos`, `CorporationList`→`CorporationDtos`, `DivisionList`→`DivisionDtos`, `DepartmentList`→`DepartmentDtos`, `TeamList`→`TeamDtos`, `EmployeeList`→`EmployeeDtos`, `CertificationList`→`CertificationDtos`, `SkillList`→`SkillDtos`
+
+**Step 2: Build, commit**
+
+```
+chore: update samples for new naming defaults
+```
+
+---
+
+### Task 13: Add JSON serialization integration test
+
+**Files:**
+- Create: `tests/DataNormalizer.Integration.Tests/JsonNamingTests.cs`
+
+**Step 1: Write test that verifies default JSON property names**
+
+Using the existing Person/Address graph:
+- Call `Normalize()` to produce the container
+- Serialize to JSON with `System.Text.Json.JsonSerializer.Serialize()`
+- Assert JSON contains `"personDtos"`, `"addressDtos"`, `"homeAddressIndex"` (camelCase)
+- Assert JSON does NOT contain `"PersonDtos"`, `"AddressDtos"` (PascalCase)
+
+**Step 2: Write test with `EmitJsonPropertyNames = false`**
+
+Create a config with `UseNaming(n => { n.EmitJsonPropertyNames = false; })`.
+- Normalize, serialize
+- Verify property names are PascalCase (no `[JsonPropertyName]` attributes → default serializer behavior)
+
+**Step 3: Write test with custom DtoSuffix**
+
+Create a config with `UseNaming(n => { n.DtoSuffix = "Model"; n.DtoPrefix = ""; })`.
+- Normalize, verify container type is `PersonResultDto` (ContainerSuffix unchanged)
+- Verify list property names are `"personModels"` in JSON
+
+**Step 4: Run tests, commit**
+
+```
+test: add JSON serialization integration tests for naming policy
+```
+
+---
+
+### Task 14: Final build and format check
+
+**Step 1:** `dotnet build --no-restore` → 0 errors
+**Step 2:** `dotnet csharpier check .` → all formatted
+**Step 3:** `dotnet test --no-restore` → all pass
 **Step 4:** Commit any formatting fixes
 
 ```
 style: format code with CSharpier
 ```
+
+---
+
+## Phase 2 (separate plan, not in scope)
+
+The following features will be designed and planned separately:
+
+- **Root property redesign**: Container has a named `Result` property (default JSON name `"result"`). Root type excluded from its own list unless referenced elsewhere in the type graph (compile-time check).
+- **UseJsonContract**: `graph.UseJsonContract(c => { c.Collection<T>("name"); c.RootPropertyName = "result"; })`
+- **Reference().JsonName()**: `x.Reference(p => p.Line).JsonName("line")` for per-property JSON name overrides
+- **[NormalizeJsonName] attribute**: Domain attribute alternative for JSON name overrides
+- **JsonContractModel/JsonContractBuilder/ReferenceBuilder**: Supporting models and config classes
