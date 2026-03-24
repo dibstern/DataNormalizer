@@ -8,6 +8,8 @@ namespace DataNormalizer.Generators.Tests.Emitters;
 [TestFixture]
 public sealed class DtoEmitterTests
 {
+    private static readonly NamingModel DefaultNaming = NamingModel.Default;
+
     [Test]
     public void Emit_SimpleFlatType_GeneratesPartialClassWithIEquatable()
     {
@@ -22,7 +24,7 @@ public sealed class DtoEmitterTests
 
         Assert.That(
             result,
-            Does.Contain("public partial class NormalizedPerson : System.IEquatable<NormalizedPerson>")
+            Does.Contain("public partial class PersonDto : System.IEquatable<PersonDto>")
         );
         Assert.That(result, Does.Contain("[System.CodeDom.Compiler.GeneratedCode(\"DataNormalizer\""));
         Assert.That(result, Does.Contain("namespace TestApp;"));
@@ -128,7 +130,7 @@ public sealed class DtoEmitterTests
 
         var result = DtoEmitter.Emit(node);
 
-        Assert.That(result, Does.Contain("public bool Equals(NormalizedPerson? other)"));
+        Assert.That(result, Does.Contain("public bool Equals(PersonDto? other)"));
         Assert.That(result, Does.Contain("if (other is null) return false;"));
         Assert.That(result, Does.Contain("ReferenceEquals(this, other)"));
     }
@@ -242,7 +244,11 @@ public sealed class DtoEmitterTests
             }
         );
 
-        var result = DtoEmitter.Emit(node, copySourceAttributes: true, jsonNamingPolicy: null);
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: true,
+            naming: new NamingModel { EmitJsonPropertyNames = false }
+        );
 
         Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"name\")]"));
         Assert.That(result, Does.Contain("public string Name { get; set; }"));
@@ -264,7 +270,11 @@ public sealed class DtoEmitterTests
             }
         );
 
-        var result = DtoEmitter.Emit(node, copySourceAttributes: true, jsonNamingPolicy: null);
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: true,
+            naming: new NamingModel { EmitJsonPropertyNames = false }
+        );
 
         Assert.That(result, Does.Contain("[System.Obsolete]"));
         Assert.That(result, Does.Contain("public TestApp.Metadata Meta { get; set; }"));
@@ -286,14 +296,18 @@ public sealed class DtoEmitterTests
             }
         );
 
-        var result = DtoEmitter.Emit(node, copySourceAttributes: false, jsonNamingPolicy: null);
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = false }
+        );
 
         Assert.That(result, Does.Not.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"name\")]"));
         Assert.That(result, Does.Contain("public string Name { get; set; }"));
     }
 
     [Test]
-    public void Emit_UseJsonNaming_CamelCase_EmitsJsonPropertyNameOnAllProperties()
+    public void Emit_EmitJsonPropertyNames_True_EmitsJsonPropertyNameOnAllProperties()
     {
         var node = CreateNode(
             "TestApp.Person",
@@ -303,7 +317,11 @@ public sealed class DtoEmitterTests
             NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
         );
 
-        var result = DtoEmitter.Emit(node, copySourceAttributes: false, jsonNamingPolicy: "CamelCase");
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
 
         Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"name\")]"));
         Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"age\")]"));
@@ -311,7 +329,7 @@ public sealed class DtoEmitterTests
     }
 
     [Test]
-    public void Emit_UseJsonNaming_CamelCase_CollectionProperty_UsesIndicesSuffix()
+    public void Emit_EmitJsonPropertyNames_True_CollectionProperty_UsesIndicesSuffix()
     {
         var node = CreateNode(
             "TestApp.Person",
@@ -323,13 +341,17 @@ public sealed class DtoEmitterTests
             )
         );
 
-        var result = DtoEmitter.Emit(node, copySourceAttributes: false, jsonNamingPolicy: "CamelCase");
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
 
         Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"phoneNumbersIndices\")]"));
     }
 
     [Test]
-    public void Emit_UseJsonNaming_DoesNotOverrideExistingJsonPropertyName()
+    public void Emit_EmitJsonPropertyNames_DoesNotOverrideExistingJsonPropertyName()
     {
         var node = CreateNode(
             "TestApp.Person",
@@ -346,7 +368,11 @@ public sealed class DtoEmitterTests
             }
         );
 
-        var result = DtoEmitter.Emit(node, copySourceAttributes: true, jsonNamingPolicy: "CamelCase");
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: true,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
 
         // Should keep the explicit attribute, NOT add a generated one
         Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"custom_name\")]"));
@@ -354,11 +380,15 @@ public sealed class DtoEmitterTests
     }
 
     [Test]
-    public void Emit_UseJsonNaming_Null_DoesNotEmitJsonPropertyName()
+    public void Emit_EmitJsonPropertyNames_False_DoesNotEmitJsonPropertyName()
     {
         var node = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
 
-        var result = DtoEmitter.Emit(node, copySourceAttributes: false, jsonNamingPolicy: null);
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = false }
+        );
 
         Assert.That(result, Does.Not.Contain("JsonPropertyName"));
     }
@@ -487,6 +517,107 @@ public sealed class DtoEmitterTests
         // GetHashCode should not reference NextIndex
         var hashSection = result.Substring(result.IndexOf("GetHashCode()"));
         Assert.That(hashSection, Does.Not.Contain("NextIndex"));
+    }
+
+    // ---- New NamingModel-specific tests ----
+
+    [Test]
+    public void Emit_EmitJsonPropertyNames_True_AllPropertiesHaveCamelCaseJsonAttributes()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            SimpleProp("FirstName", "string", isRef: true),
+            SimpleProp("Age", "int", isRef: false),
+            NormalizedProp("HomeAddress", "TestApp.Address", nullable: false),
+            CollectionProp(
+                "PhoneNumbers",
+                "System.Collections.Generic.List<TestApp.PhoneNumber>",
+                "TestApp.PhoneNumber"
+            ),
+            InlinedProp("Meta", "TestApp.Metadata", isRef: true)
+        );
+
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
+
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"firstName\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"age\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"homeAddressIndex\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"phoneNumbersIndices\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"meta\")]"));
+    }
+
+    [Test]
+    public void Emit_EmitJsonPropertyNames_False_NoJsonPropertyNameAttributes()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            SimpleProp("Name", "string", isRef: true),
+            SimpleProp("Age", "int", isRef: false),
+            NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = false }
+        );
+
+        Assert.That(result, Does.Not.Contain("JsonPropertyName"));
+    }
+
+    [Test]
+    public void Emit_CustomPrefixNoSuffix_ClassNamedMyPerson()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            SimpleProp("Name", "string", isRef: true)
+        );
+
+        var naming = new NamingModel { DtoPrefix = "My", DtoSuffix = "" };
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: naming);
+
+        Assert.That(
+            result,
+            Does.Contain("public partial class MyPerson : System.IEquatable<MyPerson>")
+        );
+        Assert.That(result, Does.Contain("public bool Equals(MyPerson? other)"));
+        Assert.That(result, Does.Contain("obj is MyPerson other"));
+    }
+
+    [Test]
+    public void Emit_NormalizedPrefix_ClassNamedNormalizedPerson()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            SimpleProp("Name", "string", isRef: true)
+        );
+
+        var naming = new NamingModel { DtoPrefix = "Normalized", DtoSuffix = "" };
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: naming);
+
+        Assert.That(
+            result,
+            Does.Contain("public partial class NormalizedPerson : System.IEquatable<NormalizedPerson>")
+        );
+    }
+
+    [Test]
+    public void Emit_DefaultNaming_ConvenienceOverload_UsesDefaultNamingModel()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            SimpleProp("Name", "string", isRef: true)
+        );
+
+        var convenienceResult = DtoEmitter.Emit(node);
+        var explicitResult = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
+
+        Assert.That(convenienceResult, Is.EqualTo(explicitResult));
     }
 
     // ---- Helpers ----
