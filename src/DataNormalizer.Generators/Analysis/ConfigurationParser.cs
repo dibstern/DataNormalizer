@@ -62,6 +62,7 @@ internal static class ConfigurationParser
                 RootPropertyName = context.RootPropertyName,
                 CollectionJsonNames = context.CollectionJsonNames.ToImmutableDictionary(),
             },
+            PropertyJsonNameOverrides = context.PropertyJsonNames.ToImmutableDictionary(),
             Diagnostics = context.Diagnostics.ToImmutableArray(),
         };
     }
@@ -118,6 +119,29 @@ internal static class ConfigurationParser
     /// </summary>
     private static ReceiverKind? AnalyzeInvocation(InvocationExpressionSyntax invocation, ParseContext context)
     {
+        // CROSS-TYPE CHAIN DETECTION: must run before GetUltimateReceiverName
+        // which would resolve x.Reference(p => p.Line).JsonName("line") to "x" (TypeBuilder),
+        // losing the cross-type transition to ReferenceBuilder.
+        if (
+            invocation.Expression is MemberAccessExpressionSyntax outerChainAccess
+            && outerChainAccess.Expression is InvocationExpressionSyntax innerChainInvocation
+        )
+        {
+            var outerMethodName = GetMethodName(outerChainAccess);
+            if (outerMethodName == "JsonName")
+            {
+                var innerResult = AnalyzeInvocation(innerChainInvocation, context);
+                if (innerResult == ReceiverKind.ReferenceBuilder)
+                {
+                    var jsonName = ExtractStringArgument(invocation);
+                    if (jsonName != null && context.CurrentReferenceKey != null)
+                        context.PropertyJsonNames[context.CurrentReferenceKey] = jsonName;
+                    context.CurrentReferenceKey = null;
+                    return ReceiverKind.ReferenceBuilder;
+                }
+            }
+        }
+
         // Handle chained calls: p.IgnoreProperty(x => x.A).IgnoreProperty(x => x.B)
         // Process the inner invocation first if the receiver is another invocation.
         if (
@@ -215,6 +239,24 @@ internal static class ConfigurationParser
             case "WithName" when receiverKind == ReceiverKind.TypeBuilder:
                 ProcessWithName(invocation, receiverName, context);
                 return ReceiverKind.TypeBuilder;
+
+            case "Reference" when receiverKind == ReceiverKind.TypeBuilder:
+            case "ReferenceCollection" when receiverKind == ReceiverKind.TypeBuilder:
+            {
+                var refPropName = ExtractPropertyNameFromLambdaArg(invocation);
+                if (refPropName != null && context.TypeBuilderMap.TryGetValue(receiverName, out var refTypeFqn))
+                    context.CurrentReferenceKey = $"{refTypeFqn}.{refPropName}";
+                return ReceiverKind.ReferenceBuilder;
+            }
+
+            case "JsonName" when receiverKind == ReceiverKind.ReferenceBuilder:
+            {
+                var jsonNameArg = ExtractStringArgument(invocation);
+                if (jsonNameArg != null && context.CurrentReferenceKey != null)
+                    context.PropertyJsonNames[context.CurrentReferenceKey] = jsonNameArg;
+                context.CurrentReferenceKey = null;
+                return ReceiverKind.ReferenceBuilder;
+            }
 
             default:
                 return null;
@@ -666,6 +708,7 @@ internal static class ConfigurationParser
         TypeBuilder,
         NamingBuilder,
         JsonContractBuilder,
+        ReferenceBuilder,
     }
 
     private sealed class ParseContext(SemanticModel semanticModel)
@@ -716,6 +759,10 @@ internal static class ConfigurationParser
         public string? RootPropertyName { get; set; }
         public Dictionary<string, string> CollectionJsonNames { get; } = new();
         public HashSet<string> SeenCollectionTypes { get; } = new();
+
+        // Reference().JsonName() tracking
+        public Dictionary<string, string> PropertyJsonNames { get; } = new();
+        public string? CurrentReferenceKey { get; set; }
 
         // Diagnostics collected during parse
         public List<GeneratorDiagnosticInfo> Diagnostics { get; } = new();

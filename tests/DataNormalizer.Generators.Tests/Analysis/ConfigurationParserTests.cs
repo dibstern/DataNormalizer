@@ -791,6 +791,200 @@ public sealed class ConfigurationParserTests
         Assert.That(model.Diagnostics[0].TypeName, Does.Contain("SearchLine"));
     }
 
+    // ---- Reference().JsonName() Tests ----
+
+    [Test]
+    public void Parse_ReferenceJsonName_FluentChain_StoresPropertyJsonNameOverride()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                x.Reference(p => p.Line).JsonName("line");
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public SearchLine? Line { get; set; } }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Has.Count.EqualTo(1));
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Person.Line"], Is.EqualTo("line"));
+    }
+
+    [Test]
+    public void Parse_ReferenceCollectionJsonName_FluentChain_StoresPropertyJsonNameOverride()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                x.ReferenceCollection(p => p.Items).JsonName("items");
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public System.Collections.Generic.List<Item> Items { get; set; } = new(); }
+            public class Item { public int Id { get; set; } }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Has.Count.EqualTo(1));
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Person.Items"], Is.EqualTo("items"));
+    }
+
+    [Test]
+    public void Parse_MultipleReferenceJsonName_OnSameTypeBuilder_AllStored()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                x.Reference(p => p.Line).JsonName("line");
+                x.Reference(p => p.Address).JsonName("addr");
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public SearchLine? Line { get; set; } public Address? Address { get; set; } }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            public class Address { public string Street { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Has.Count.EqualTo(2));
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Person.Line"], Is.EqualTo("line"));
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Person.Address"], Is.EqualTo("addr"));
+    }
+
+    [Test]
+    public void Parse_ReferenceWithoutJsonName_NoEntry_NoCrash()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                x.Reference(p => p.Line);
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public SearchLine? Line { get; set; } }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Is.Empty);
+    }
+
+    [Test]
+    public void Parse_ReferenceJsonName_SplitStatement_TrackedViaLocalVariable()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                var r = x.Reference(p => p.Line);
+                r.JsonName("line");
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public SearchLine? Line { get; set; } }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Has.Count.EqualTo(1));
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Person.Line"], Is.EqualTo("line"));
+    }
+
+    [Test]
+    public void Parse_ConsecutiveReferences_OnlyOneWithJsonName_OnlyThatOneStored()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                x.Reference(p => p.Line);
+                x.Reference(p => p.Address).JsonName("addr");
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public SearchLine? Line { get; set; } public Address? Address { get; set; } }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            public class Address { public string Street { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Has.Count.EqualTo(1));
+        Assert.That(model.PropertyJsonNameOverrides.ContainsKey("TestApp.Person.Address"), Is.True);
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Person.Address"], Is.EqualTo("addr"));
+    }
+
+    [Test]
+    public void Parse_ReferenceJsonName_EmptyString_StoredAsEmpty()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                x.Reference(p => p.Line).JsonName("");
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public SearchLine? Line { get; set; } }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Has.Count.EqualTo(1));
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Person.Line"], Is.EqualTo(""));
+    }
+
+    [Test]
+    public void Parse_ReferenceJsonName_NonLiteralArg_SilentlySkipped()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                var name = "line";
+                x.Reference(p => p.Line).JsonName(name);
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public SearchLine? Line { get; set; } }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Is.Empty);
+    }
+
+    [Test]
+    public void Parse_TwoForTypeBlocks_WithReferenceJsonName_BothStoredIsolated()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(x =>
+            {
+                x.Reference(p => p.Line).JsonName("line");
+            });
+            builder.ForType<Order>(x =>
+            {
+                x.Reference(p => p.Customer).JsonName("customer");
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; public SearchLine? Line { get; set; } }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            public class Order { public int Id { get; set; } public Person? Customer { get; set; } }
+            """
+        );
+
+        Assert.That(model.PropertyJsonNameOverrides, Has.Count.EqualTo(2));
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Person.Line"], Is.EqualTo("line"));
+        Assert.That(model.PropertyJsonNameOverrides["TestApp.Order.Customer"], Is.EqualTo("customer"));
+    }
+
     // ---- Test Helper ----
 
     private static NormalizationModel ParseConfig(
