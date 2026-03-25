@@ -78,28 +78,27 @@ var restored = AppNormalization.Denormalize(result);
 
 The `Normalize` and `Denormalize` static methods are generated at compile time by the source generator.
 
-## What the source generator produces
+## How It Works
 
-For each type in the graph, the generator creates:
+The source generator analyzes your `Configure` method at compile time and produces:
 
-- **`Normalized{TypeName}`** — a partial class implementing `IEquatable<T>` for value-based deduplication.
-- **`{Name}Index`** (`int`) — replaces nested object references with integer indices.
-- **`{Name}Indices`** (`int[]`) — replaces collection references with integer index arrays.
-- **Inlined properties** keep their original type (for types marked as inline).
-- All generated DTOs are `partial`, so you can extend them with additional members.
+- **Per-type DTOs (`{TypeName}Dto`)** — partial classes implementing `IEquatable<T>` for value-based dedup. Object references become `int` (`{Name}Index`), collections become `int[]` (`{Name}Indices`). Types marked as inline keep their original structure.
+- **Container result (`{RootType}ResultDto`)** — holds a `Result` property for the root entity and typed arrays for every other entity type. If the root type is also referenced by other types, a root list array is included too.
+- **`Normalize(T)` / `Denormalize({RootType}ResultDto)`** — static methods on your configuration class. `Normalize` flattens the object graph with value-equality dedup. `Denormalize` reconstructs the full graph with shared references preserved.
+- **Naming and JSON serialization** — DTOs get a `Dto` suffix by default. `[JsonPropertyName]` attributes are emitted for camelCase JSON. Both are configurable via `UseNaming()`. Wire format is customizable with `UseJsonContract()` and `Reference().JsonName()`.
+- All generated types are `partial`, so you can extend them with additional members.
 
 ## Working with the result
 
-The `Normalize` method returns a container DTO (`Normalized{RootType}Result`) with typed arrays for every entity type in the graph:
+The `Normalize` method returns a container DTO (`TeamResultDto`) with a `Result` property for the root entity and typed arrays for every other entity type:
 
 ```csharp
 var result = AppNormalization.Normalize(team);
 
-result.TeamList[0]                       // The root DTO (always at index 0)
+result.Result                            // TeamDto — the root entity (always present)
 
-result.TeamList                          // NormalizedTeam[] (typed array)
-result.PersonList                        // NormalizedPerson[] (typed array)
-result.AddressList                       // NormalizedAddress[] (typed array)
+result.PersonDtos                        // PersonDto[] (typed array)
+result.AddressDtos                       // AddressDto[] (typed array)
 // All collections are typed properties — no string-keyed lookups.
 // The container serializes directly with System.Text.Json.
 ```
@@ -109,4 +108,5 @@ For full API details, see the [API Reference](../api/index.md).
 ## Next steps
 
 - [Configuration Guide](configuration.md) — All configuration options including opt-out, ignore, and explicit-only mode
-- [Diagnostics Reference](diagnostics.md) — Compiler diagnostics DN0001–DN0004
+- [Naming & JSON Contracts](naming-and-contracts.md) — Customize DTO suffixes, JSON property names, and wire format
+- [Diagnostics Reference](diagnostics.md) — Compiler diagnostics DN0001–DN1002
