@@ -74,4 +74,16 @@ public sealed class GraphBuilder<T>
     /// </summary>
     /// <returns>This builder instance for chaining.</returns>
     public GraphBuilder<T> UseReferenceTrackingForCycles() => this;
+
+    /// <summary>
+    /// Configures JSON contract customization for the generated container DTO.
+    /// This is a syntactic marker — the source generator reads it via Roslyn syntax analysis.
+    /// </summary>
+    /// <param name="configure">An action to configure the JSON contract builder.</param>
+    /// <returns>This builder instance for chaining.</returns>
+    public GraphBuilder<T> UseJsonContract(Action<JsonContractBuilder> configure)
+    {
+        configure(new JsonContractBuilder());
+        return this;
+    }
 }

@@ -51,4 +51,20 @@ public sealed class TypeBuilder<T>
     /// <param name="mode">The property mode to use.</param>
     /// <returns>This builder instance for chaining.</returns>
     public TypeBuilder<T> UsePropertyMode(PropertyMode mode) => this;
+
+    /// <summary>
+    /// Marks a navigation property as a reference (single object).
+    /// Returns a <see cref="ReferenceBuilder"/> for further configuration such as JSON name overrides.
+    /// </summary>
+    /// <param name="selector">Expression selecting the reference property.</param>
+    /// <returns>A <see cref="ReferenceBuilder"/> for configuring the reference.</returns>
+    public ReferenceBuilder Reference(Expression<Func<T, object?>> selector) => new();
+
+    /// <summary>
+    /// Marks a navigation property as a reference collection.
+    /// Returns a <see cref="ReferenceBuilder"/> for further configuration such as JSON name overrides.
+    /// </summary>
+    /// <param name="selector">Expression selecting the reference collection property.</param>
+    /// <returns>A <see cref="ReferenceBuilder"/> for configuring the reference.</returns>
+    public ReferenceBuilder ReferenceCollection(Expression<Func<T, object?>> selector) => new();
 }

@@ -105,4 +105,49 @@ public sealed class AttributeTests
         var usage = typeof(NormalizeIncludeAttribute).GetCustomAttribute<AttributeUsageAttribute>();
         Assert.That(usage!.AllowMultiple, Is.False);
     }
+
+    [Test]
+    public void NormalizeJsonNameAttribute_StoresName()
+    {
+        var attr = new NormalizeJsonNameAttribute("custom_name");
+
+        Assert.That(attr.Name, Is.EqualTo("custom_name"));
+    }
+
+    [Test]
+    public void NormalizeJsonNameAttribute_Name_ReturnsConstructorValue()
+    {
+        var name = "my_json_property";
+        var attr = new NormalizeJsonNameAttribute(name);
+
+        Assert.That(attr.Name, Is.EqualTo(name));
+    }
+
+    [Test]
+    public void NormalizeJsonNameAttribute_TargetsProperty()
+    {
+        var usage = typeof(NormalizeJsonNameAttribute).GetCustomAttribute<AttributeUsageAttribute>();
+        Assert.That(usage, Is.Not.Null);
+        Assert.That(usage!.ValidOn, Is.EqualTo(AttributeTargets.Property));
+    }
+
+    [Test]
+    public void NormalizeJsonNameAttribute_IsNotInherited()
+    {
+        var usage = typeof(NormalizeJsonNameAttribute).GetCustomAttribute<AttributeUsageAttribute>();
+        Assert.That(usage!.Inherited, Is.False);
+    }
+
+    [Test]
+    public void NormalizeJsonNameAttribute_IsSealed()
+    {
+        Assert.That(typeof(NormalizeJsonNameAttribute).IsSealed, Is.True);
+    }
+
+    [Test]
+    public void NormalizeJsonNameAttribute_DoesNotAllowMultiple()
+    {
+        var usage = typeof(NormalizeJsonNameAttribute).GetCustomAttribute<AttributeUsageAttribute>();
+        Assert.That(usage!.AllowMultiple, Is.False);
+    }
 }

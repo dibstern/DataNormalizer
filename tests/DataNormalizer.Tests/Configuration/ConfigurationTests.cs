@@ -286,4 +286,134 @@ public sealed class ConfigurationTests
 
         Assert.That(result, Is.SameAs(graphBuilder));
     }
+
+    // --- JsonContractBuilder tests ---
+
+    [Test]
+    public void JsonContractBuilder_RootPropertyName_RoundTrips()
+    {
+        var builder = new JsonContractBuilder();
+
+        builder.RootPropertyName = "root";
+
+        Assert.That(builder.RootPropertyName, Is.EqualTo("root"));
+    }
+
+    [Test]
+    public void JsonContractBuilder_RootPropertyName_DefaultsToNull()
+    {
+        var builder = new JsonContractBuilder();
+
+        Assert.That(builder.RootPropertyName, Is.Null);
+    }
+
+    [Test]
+    public void JsonContractBuilder_Collection_DoesNotThrow()
+    {
+        var builder = new JsonContractBuilder();
+
+        Assert.That(() => builder.Collection<TestPerson>("people"), Throws.Nothing);
+    }
+
+    [Test]
+    public void JsonContractBuilder_Collection_WithVariousTypes_DoesNotThrow()
+    {
+        var builder = new JsonContractBuilder();
+
+        Assert.That(() => builder.Collection<TestPerson>("people"), Throws.Nothing);
+        Assert.That(() => builder.Collection<TestAddress>("addresses"), Throws.Nothing);
+        Assert.That(() => builder.Collection<string>("strings"), Throws.Nothing);
+    }
+
+    // --- ReferenceBuilder tests ---
+
+    [Test]
+    public void ReferenceBuilder_JsonName_ReturnsSelf()
+    {
+        var builder = new ReferenceBuilder();
+
+        var result = builder.JsonName("person_id");
+
+        Assert.That(result, Is.SameAs(builder));
+    }
+
+    [Test]
+    public void ReferenceBuilder_JsonName_CanBeChained()
+    {
+        var builder = new ReferenceBuilder();
+
+        var result = builder.JsonName("first").JsonName("second");
+
+        Assert.That(result, Is.SameAs(builder));
+    }
+
+    // --- GraphBuilder.UseJsonContract tests ---
+
+    [Test]
+    public void GraphBuilder_UseJsonContract_ReturnsSelf()
+    {
+        var graphBuilder = new NormalizeBuilder().NormalizeGraph<TestPerson>();
+
+        var result = graphBuilder.UseJsonContract(c => { });
+
+        Assert.That(result, Is.SameAs(graphBuilder));
+    }
+
+    [Test]
+    public void GraphBuilder_UseJsonContract_InvokesLambda()
+    {
+        var graphBuilder = new NormalizeBuilder().NormalizeGraph<TestPerson>();
+        var lambdaCalled = false;
+
+        graphBuilder.UseJsonContract(c =>
+        {
+            lambdaCalled = true;
+        });
+
+        Assert.That(lambdaCalled, Is.True);
+    }
+
+    // --- TypeBuilder.Reference / ReferenceCollection tests ---
+
+    [Test]
+    public void TypeBuilder_Reference_ReturnsReferenceBuilder()
+    {
+        var typeBuilder = new NormalizeBuilder().ForType<TestPerson>();
+
+        var result = typeBuilder.Reference(p => p.Name);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result, Is.InstanceOf<ReferenceBuilder>());
+    }
+
+    [Test]
+    public void TypeBuilder_ReferenceCollection_ReturnsReferenceBuilder()
+    {
+        var typeBuilder = new NormalizeBuilder().ForType<TestPerson>();
+
+        var result = typeBuilder.ReferenceCollection(p => p.Name);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result, Is.InstanceOf<ReferenceBuilder>());
+    }
+
+    [Test]
+    public void TypeBuilder_Reference_WithPropertySelector_Compiles()
+    {
+        var typeBuilder = new NormalizeBuilder().ForType<TestPerson>();
+
+        var result = typeBuilder.Reference(p => p.InternalId);
+
+        Assert.That(result, Is.InstanceOf<ReferenceBuilder>());
+    }
+
+    [Test]
+    public void TypeBuilder_ReferenceCollection_WithPropertySelector_Compiles()
+    {
+        var typeBuilder = new NormalizeBuilder().ForType<TestPerson>();
+
+        var result = typeBuilder.ReferenceCollection(p => p.InternalId);
+
+        Assert.That(result, Is.InstanceOf<ReferenceBuilder>());
+    }
 }
