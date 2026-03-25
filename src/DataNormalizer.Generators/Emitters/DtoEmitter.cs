@@ -81,6 +81,15 @@ internal static class DtoEmitter
         NamingModel naming
     )
     {
+        // If JsonNameOverride is set (non-null, non-empty), always emit it — even when EmitJsonPropertyNames is false
+        if (!string.IsNullOrEmpty(prop.JsonNameOverride))
+        {
+            sb.AppendLine(
+                $"    [System.Text.Json.Serialization.JsonPropertyName(\"{prop.JsonNameOverride}\")]"
+            );
+            return;
+        }
+
         if (!naming.EmitJsonPropertyNames)
             return;
 
@@ -107,8 +116,13 @@ internal static class DtoEmitter
         if (!copySourceAttributes)
             return;
 
+        var suppressJsonPropertyName = !string.IsNullOrEmpty(prop.JsonNameOverride);
+
         foreach (var attr in prop.SourceAttributes)
         {
+            if (suppressJsonPropertyName && attr.Contains("JsonPropertyName"))
+                continue;
+
             sb.AppendLine($"    {attr}");
         }
     }

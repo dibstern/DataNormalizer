@@ -605,6 +605,297 @@ public sealed class DtoEmitterTests
         );
     }
 
+    // ---- JsonNameOverride tests ----
+
+    [Test]
+    public void Emit_NormalizedProperty_WithJsonNameOverride_EmitsOverrideOnIndexProperty()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "Line",
+                TypeFullName = "TestApp.Line",
+                Kind = PropertyKind.Normalized,
+                IsReferenceType = true,
+                JsonNameOverride = "line",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"line\")]"));
+        Assert.That(result, Does.Not.Contain("JsonPropertyName(\"lineIndex\")"));
+    }
+
+    [Test]
+    public void Emit_CollectionProperty_WithJsonNameOverride_EmitsOverrideOnIndicesArray()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "TransitImages",
+                TypeFullName = "System.Collections.Generic.List<TestApp.Image>",
+                Kind = PropertyKind.Collection,
+                IsCollection = true,
+                CollectionElementTypeFullName = "TestApp.Image",
+                CollectionKind = CollectionTypeKind.List,
+                IsReferenceType = true,
+                JsonNameOverride = "transitImages",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"transitImages\")]"));
+        Assert.That(result, Does.Not.Contain("JsonPropertyName(\"transitImagesIndices\")"));
+    }
+
+    [Test]
+    public void Emit_SimpleProperty_WithJsonNameOverride_EmitsOverride()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "FullName",
+                TypeFullName = "string",
+                Kind = PropertyKind.Simple,
+                IsReferenceType = true,
+                JsonNameOverride = "name",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"name\")]"));
+        Assert.That(result, Does.Not.Contain("JsonPropertyName(\"fullName\")"));
+    }
+
+    [Test]
+    public void Emit_InlinedProperty_WithJsonNameOverride_EmitsOverride()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "Metadata",
+                TypeFullName = "TestApp.Metadata",
+                Kind = PropertyKind.Inlined,
+                IsReferenceType = true,
+                JsonNameOverride = "details",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"details\")]"));
+        Assert.That(result, Does.Not.Contain("JsonPropertyName(\"metadata\")"));
+    }
+
+    [Test]
+    public void Emit_PropertyWithNoOverride_UsesDefaultCamelCase()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            NormalizedProp("Line", "TestApp.Line", nullable: false)
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"lineIndex\")]"));
+    }
+
+    [Test]
+    public void Emit_JsonNameOverride_WhenEmitJsonPropertyNamesFalse_StillEmitsOverride()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "Line",
+                TypeFullName = "TestApp.Line",
+                Kind = PropertyKind.Normalized,
+                IsReferenceType = true,
+                JsonNameOverride = "line",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = false }
+        );
+
+        // Override is explicit — should still emit even when EmitJsonPropertyNames is false
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"line\")]"));
+    }
+
+    [Test]
+    public void Emit_MixedProperties_SomeWithOverridesSomeWithout_CorrectAttributes()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "Line",
+                TypeFullName = "TestApp.Line",
+                Kind = PropertyKind.Normalized,
+                IsReferenceType = true,
+                JsonNameOverride = "line",
+            },
+            SimpleProp("Age", "int", isRef: false),
+            new AnalyzedProperty
+            {
+                Name = "Items",
+                TypeFullName = "System.Collections.Generic.List<TestApp.Item>",
+                Kind = PropertyKind.Collection,
+                IsCollection = true,
+                CollectionElementTypeFullName = "TestApp.Item",
+                CollectionKind = CollectionTypeKind.List,
+                IsReferenceType = true,
+                JsonNameOverride = "items",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        // Override properties use the override value
+        Assert.That(result, Does.Contain("JsonPropertyName(\"line\")"));
+        Assert.That(result, Does.Contain("JsonPropertyName(\"items\")"));
+        // Non-override property uses default camelCase
+        Assert.That(result, Does.Contain("JsonPropertyName(\"age\")"));
+    }
+
+    [Test]
+    public void Emit_CopySourceAttributes_WithExistingJsonPropertyNameAndOverride_EmitsOnlyOverride()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "Name",
+                TypeFullName = "string",
+                Kind = PropertyKind.Simple,
+                IsReferenceType = true,
+                SourceAttributes = ImmutableArray.Create(
+                    "[System.Text.Json.Serialization.JsonPropertyName(\"original\")]"
+                ),
+                JsonNameOverride = "override",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: true,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        // Should emit ONLY the override, not the source attribute's JsonPropertyName
+        Assert.That(result, Does.Contain("JsonPropertyName(\"override\")"));
+        Assert.That(result, Does.Not.Contain("JsonPropertyName(\"original\")"));
+        // Should appear exactly once
+        Assert.That(CountOccurrences(result, "JsonPropertyName"), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Emit_EmptyStringJsonNameOverride_TreatedAsNull_DefaultBehavior()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "Line",
+                TypeFullName = "TestApp.Line",
+                Kind = PropertyKind.Normalized,
+                IsReferenceType = true,
+                JsonNameOverride = "",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        // Empty string treated as null — default camelCase behavior
+        Assert.That(result, Does.Contain("JsonPropertyName(\"lineIndex\")"));
+    }
+
+    [Test]
+    public void Emit_JsonNameOverride_DoesNotChangeCSharpPropertyName()
+    {
+        var node = CreateNode(
+            "TestApp.Person",
+            "Person",
+            new AnalyzedProperty
+            {
+                Name = "Line",
+                TypeFullName = "TestApp.Line",
+                Kind = PropertyKind.Normalized,
+                IsReferenceType = true,
+                JsonNameOverride = "customLine",
+            }
+        );
+
+        var result = DtoEmitter.Emit(
+            node,
+            copySourceAttributes: false,
+            naming: new NamingModel { EmitJsonPropertyNames = true }
+        );
+
+        // C# property name should still be LineIndex, not customLine
+        Assert.That(result, Does.Contain("public int LineIndex { get; set; }"));
+        Assert.That(result, Does.Contain("JsonPropertyName(\"customLine\")"));
+    }
+
+    private static int CountOccurrences(string text, string pattern)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(pattern, index, System.StringComparison.Ordinal)) != -1)
+        {
+            count++;
+            index += pattern.Length;
+        }
+        return count;
+    }
+
     // ---- Helpers ----
 
     private static TypeGraphNode CreateNode(string fullName, string name, params AnalyzedProperty[] props)
