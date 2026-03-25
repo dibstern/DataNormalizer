@@ -87,13 +87,32 @@ internal static class NormalizerEmitter
             var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName, model.Naming);
             var typeKey = EmitterHelpers.GetTypeKey(node, model);
             var camel = EmitterHelpers.ToCamelCase(node.TypeName);
-            var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, model.Naming);
 
-            sb.AppendLine($"        var __{camel}Col = context.GetCollection<{dtoFullName}>(\"{typeKey}\");");
-            sb.AppendLine($"        var __{camel}Arr = new {dtoFullName}[__{camel}Col.Count];");
-            sb.AppendLine($"        for (var __i = 0; __i < __{camel}Col.Count; __i++)");
-            sb.AppendLine($"            __{camel}Arr[__i] = __{camel}Col[__i];");
-            sb.AppendLine($"        result.{listPropertyName} = __{camel}Arr;");
+            if (node.IsRootType)
+            {
+                // Always set the Result property for the root type
+                sb.AppendLine($"        var __{camel}Col = context.GetCollection<{dtoFullName}>(\"{typeKey}\");");
+                sb.AppendLine($"        if (__{camel}Col.Count > 0)");
+                sb.AppendLine($"            result.Result = __{camel}Col[0];");
+
+                if (node.NeedsList)
+                {
+                    var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, model.Naming);
+                    sb.AppendLine($"        var __{camel}Arr = new {dtoFullName}[__{camel}Col.Count];");
+                    sb.AppendLine($"        for (var __i = 0; __i < __{camel}Col.Count; __i++)");
+                    sb.AppendLine($"            __{camel}Arr[__i] = __{camel}Col[__i];");
+                    sb.AppendLine($"        result.{listPropertyName} = __{camel}Arr;");
+                }
+            }
+            else
+            {
+                var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, model.Naming);
+                sb.AppendLine($"        var __{camel}Col = context.GetCollection<{dtoFullName}>(\"{typeKey}\");");
+                sb.AppendLine($"        var __{camel}Arr = new {dtoFullName}[__{camel}Col.Count];");
+                sb.AppendLine($"        for (var __i = 0; __i < __{camel}Col.Count; __i++)");
+                sb.AppendLine($"            __{camel}Arr[__i] = __{camel}Col[__i];");
+                sb.AppendLine($"        result.{listPropertyName} = __{camel}Arr;");
+            }
         }
 
         sb.AppendLine("        return result;");

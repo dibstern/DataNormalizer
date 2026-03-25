@@ -151,7 +151,7 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             }
             if (rootNode == null)
                 continue;
-            var containerSource = ContainerEmitter.Emit(rootNode, rootNodes, model.Naming);
+            var containerSource = ContainerEmitter.Emit(rootNode, rootNodes, model.Naming, model.JsonContract);
             var containerHintPrefix = string.IsNullOrEmpty(model.ConfigNamespace)
                 ? model.ConfigClassName
                 : $"{model.ConfigNamespace}.{model.ConfigClassName}";

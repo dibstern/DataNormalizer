@@ -18,7 +18,7 @@ public sealed class ConfigFeatureTests
         };
 
         var result = IgnorePropertyConfig.Normalize(employee);
-        var root = result.EmployeeDtos[0];
+        var root = result.Result;
 
         // NormalizedEmployee should NOT have an Age property
         // Verify via reflection that the DTO type doesn't have "Age"

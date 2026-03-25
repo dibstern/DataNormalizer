@@ -28,12 +28,13 @@ public sealed class JsonNamingTests
         var json = JsonSerializer.Serialize(result);
 
         // Default config emits [JsonPropertyName] with camelCase
-        Assert.That(json, Does.Contain("\"personDtos\""));
+        // Root type uses "result" instead of a list
+        Assert.That(json, Does.Contain("\"result\""));
         Assert.That(json, Does.Contain("\"addressDtos\""));
         Assert.That(json, Does.Contain("\"homeAddressIndex\""));
 
         // Should NOT contain PascalCase property names
-        Assert.That(json, Does.Not.Contain("\"PersonDtos\""));
+        Assert.That(json, Does.Not.Contain("\"Result\""));
         Assert.That(json, Does.Not.Contain("\"AddressDtos\""));
         Assert.That(json, Does.Not.Contain("\"HomeAddressIndex\""));
     }
@@ -55,13 +56,13 @@ public sealed class JsonNamingTests
         var result = NoJsonNamingConfig.Normalize(contact);
         var json = JsonSerializer.Serialize(result);
 
-        // EmitJsonPropertyNames = false → no [JsonPropertyName] → PascalCase by default
-        Assert.That(json, Does.Contain("\"ContactDtos\""));
+        // EmitJsonPropertyNames = false → no [JsonPropertyName] on lists → PascalCase by default
+        // But Result always gets [JsonPropertyName("result")] regardless
+        Assert.That(json, Does.Contain("\"result\""));
         Assert.That(json, Does.Contain("\"LocationDtos\""));
         Assert.That(json, Does.Contain("\"HomeAddressIndex\""));
 
-        // Should NOT contain camelCase
-        Assert.That(json, Does.Not.Contain("\"contactDtos\""));
+        // Lists should NOT contain camelCase (no JsonPropertyName on them)
         Assert.That(json, Does.Not.Contain("\"locationDtos\""));
         Assert.That(json, Does.Not.Contain("\"homeAddressIndex\""));
     }
@@ -106,9 +107,9 @@ public sealed class JsonNamingTests
         var result = CustomSuffixNamingConfig.Normalize(contact);
         var json = JsonSerializer.Serialize(result);
 
-        // DtoSuffix = "Model" → list properties are "ContactModels", "LocationModels"
+        // Root type uses "result" property; non-root types use DtoSuffix = "Model"
         // With EmitJsonPropertyNames = true (default) → camelCase in JSON
-        Assert.That(json, Does.Contain("\"contactModels\""));
+        Assert.That(json, Does.Contain("\"result\""));
         Assert.That(json, Does.Contain("\"locationModels\""));
 
         // Should NOT contain "Dto" suffix in list names
@@ -147,9 +148,9 @@ public sealed class JsonNamingTests
         var result = DtoPrefixNamingConfig.Normalize(contact);
         var json = JsonSerializer.Serialize(result);
 
-        // DtoSuffix = "" → list property falls back to "{baseName}List" pattern
-        // camelCase in JSON: "contactList", "locationList"
-        Assert.That(json, Does.Contain("\"contactList\""));
+        // Root type uses "result" property; non-root with DtoSuffix = "" → "{baseName}List"
+        // camelCase in JSON: "result", "locationList"
+        Assert.That(json, Does.Contain("\"result\""));
         Assert.That(json, Does.Contain("\"locationList\""));
     }
 
@@ -160,13 +161,13 @@ public sealed class JsonNamingTests
         var result = DtoPrefixNamingConfig.Normalize(contact);
 
         // DTO name = {DtoPrefix}{TypeName}{DtoSuffix} = "Flat" + "Contact" + "" = "FlatContact"
+        // Root type uses Result property instead of ContactList
         var containerType = result.GetType();
-        var contactListProp = containerType.GetProperty("ContactList");
-        Assert.That(contactListProp, Is.Not.Null, "Expected ContactList property on container");
+        var resultProp = containerType.GetProperty("Result");
+        Assert.That(resultProp, Is.Not.Null, "Expected Result property on container");
 
-        var elementType = contactListProp!.PropertyType.GetElementType();
-        Assert.That(elementType, Is.Not.Null);
-        Assert.That(elementType!.Name, Is.EqualTo("FlatContact"));
+        var resultType = resultProp!.PropertyType;
+        Assert.That(resultType.Name, Is.EqualTo("FlatContact"));
     }
 
     // --- Gap 2: ContainerSuffix tests ---
@@ -200,8 +201,8 @@ public sealed class JsonNamingTests
         var result = ContainerSuffixNamingConfig.Normalize(contact);
         var json = JsonSerializer.Serialize(result);
 
-        // DtoSuffix is still default "Dto" → list properties are "contactDtos", "locationDtos"
-        Assert.That(json, Does.Contain("\"contactDtos\""));
+        // Root type uses "result"; non-root DtoSuffix is still default "Dto" → "locationDtos"
+        Assert.That(json, Does.Contain("\"result\""));
         Assert.That(json, Does.Contain("\"locationDtos\""));
     }
 
@@ -226,9 +227,9 @@ public sealed class JsonNamingTests
         var result = GraphNamingConfig.Normalize(contact);
         var json = JsonSerializer.Serialize(result);
 
-        // Global DtoSuffix = "Record", but graph overrides with "View"
-        // → list properties use "View" suffix: "contactViews", "locationViews"
-        Assert.That(json, Does.Contain("\"contactViews\""));
+        // Root type uses "result"; non-root types use graph-level DtoSuffix override "View"
+        // → list properties use "View" suffix: "locationViews"
+        Assert.That(json, Does.Contain("\"result\""));
         Assert.That(json, Does.Contain("\"locationViews\""));
 
         // Should NOT contain the global "Record" suffix

@@ -22,7 +22,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         Assert.That(root.Name, Is.EqualTo("Alice"));
         Assert.That(root.Age, Is.EqualTo(30));
@@ -44,7 +44,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         // HomeAddressIndex should be a valid index
         Assert.That(root.HomeAddressIndex, Is.GreaterThanOrEqualTo(0));
@@ -79,7 +79,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         // Same address values should dedup to one entry
         Assert.That(root.HomeAddressIndex, Is.EqualTo(root.WorkAddressIndex));
@@ -109,7 +109,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         Assert.That(root.HomeAddressIndex, Is.Not.EqualTo(root.WorkAddressIndex));
         var addresses = result.AddressDtos;
@@ -134,7 +134,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         Assert.That(root.HomeAddressIndex, Is.EqualTo(root.WorkAddressIndex));
     }
@@ -156,7 +156,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         Assert.That(root.WorkAddressIndex, Is.Null);
     }
@@ -178,7 +178,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         Assert.That(root.PhoneNumbersIndices, Is.Empty);
     }
@@ -204,7 +204,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         Assert.That(root.PhoneNumbersIndices, Has.Length.EqualTo(2));
         var phones = result.PhoneNumberDtos;
@@ -229,7 +229,7 @@ public sealed class SimpleNormalizationTests
         };
 
         var result = BasicNormalizationConfig.Normalize(person);
-        var root = result.PersonDtos[0];
+        var root = result.Result;
 
         Assert.That(root.PhoneNumbersIndices, Has.Length.EqualTo(2));
         // Both indices should be the same (dedup)
@@ -265,7 +265,7 @@ public sealed class SimpleNormalizationTests
         var personResult = BasicNormalizationConfig.Normalize(person);
         var orderResult = BasicNormalizationConfig.Normalize(order);
 
-        Assert.That(personResult.PersonDtos[0].Name, Is.EqualTo("Alice"));
-        Assert.That(orderResult.OrderDtos[0].OrderId, Is.EqualTo(42));
+        Assert.That(personResult.Result.Name, Is.EqualTo("Alice"));
+        Assert.That(orderResult.Result.OrderId, Is.EqualTo(42));
     }
 }

@@ -41,7 +41,7 @@ Console.WriteLine();
 
 var result = SampleNormalization.Normalize(order);
 
-var root = result.OrderDtos[0];
+var root = result.Result;
 
 Console.WriteLine("--- Normalized Structure ---");
 Console.WriteLine($"Root OrderId: {root.OrderId}");
@@ -51,7 +51,6 @@ Console.WriteLine($"Root OrderLine indices: [{string.Join(", ", root.LinesIndice
 Console.WriteLine();
 
 Console.WriteLine("--- Collections ---");
-Console.WriteLine($"  OrderDtos: {result.OrderDtos.Length}");
 Console.WriteLine($"  CustomerDtos: {result.CustomerDtos.Length}");
 Console.WriteLine($"  AddressDtos: {result.AddressDtos.Length}");
 Console.WriteLine($"  OrderLineDtos: {result.OrderLineDtos.Length}");
@@ -216,7 +215,6 @@ Console.WriteLine();
 var corpResult = CorporateNormalization.Normalize(corp);
 
 Console.WriteLine("--- Collections ---");
-Console.WriteLine($"  CorporationDtos: {corpResult.CorporationDtos.Length}");
 Console.WriteLine($"  DivisionDtos: {corpResult.DivisionDtos.Length}");
 Console.WriteLine($"  DepartmentDtos: {corpResult.DepartmentDtos.Length}");
 Console.WriteLine($"  TeamDtos: {corpResult.TeamDtos.Length}");

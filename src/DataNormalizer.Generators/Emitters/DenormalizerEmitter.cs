@@ -93,8 +93,18 @@ internal static class DenormalizerEmitter
         {
             var node = allNodes[i];
             var camel = EmitterHelpers.ToCamelCase(node.TypeName);
-            var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, naming);
-            sb.AppendLine($"        var {camel}Dtos = normalized.{listPropertyName};");
+            var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName, naming);
+
+            if (node.IsRootType && !node.NeedsList)
+            {
+                // Root without a list: create a single-element array from the Result property
+                sb.AppendLine($"        var {camel}Dtos = new {dtoFullName}[] {{ normalized.Result }};");
+            }
+            else
+            {
+                var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, naming);
+                sb.AppendLine($"        var {camel}Dtos = normalized.{listPropertyName};");
+            }
         }
     }
 

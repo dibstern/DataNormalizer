@@ -6,7 +6,12 @@ namespace DataNormalizer.Generators.Emitters;
 
 internal static class ContainerEmitter
 {
-    public static string Emit(TypeGraphNode rootNode, IReadOnlyList<TypeGraphNode> allNodes, NamingModel naming)
+    public static string Emit(
+        TypeGraphNode rootNode,
+        IReadOnlyList<TypeGraphNode> allNodes,
+        NamingModel naming,
+        JsonContractModel jsonContract
+    )
     {
         var sb = new StringBuilder();
         var ns = EmitterHelpers.GetNamespace(rootNode.TypeFullName);
@@ -28,13 +33,37 @@ internal static class ContainerEmitter
         sb.AppendLine($"public partial class {containerName}");
         sb.AppendLine("{");
 
+        // Always emit the Result property for the root type
+        var rootDtoFullName = EmitterHelpers.GetDtoFullName(
+            rootNode.TypeFullName,
+            rootNode.TypeName,
+            naming
+        );
+        var rootJsonName = string.IsNullOrEmpty(jsonContract.RootPropertyName)
+            ? "result"
+            : jsonContract.RootPropertyName;
+        sb.AppendLine(
+            $"    [System.Text.Json.Serialization.JsonPropertyName(\"{rootJsonName}\")]"
+        );
+        sb.AppendLine($"    public {rootDtoFullName} Result {{ get; set; }} = default!;");
+
+        // Emit list properties for each node
         for (var i = 0; i < allNodes.Count; i++)
         {
             var node = allNodes[i];
-            var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName, naming);
+
+            // Skip list for root node if NeedsList is false
+            if (node.IsRootType && !node.NeedsList)
+                continue;
+
+            var dtoFullName = EmitterHelpers.GetDtoFullName(
+                node.TypeFullName,
+                node.TypeName,
+                naming
+            );
             var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, naming);
 
-            EmitJsonNamingAttribute(sb, listPropertyName, naming);
+            EmitJsonNamingAttribute(sb, node, listPropertyName, naming, jsonContract);
             sb.AppendLine(
                 $"    public {dtoFullName}[] {listPropertyName} {{ get; set; }} = System.Array.Empty<{dtoFullName}>();"
             );
@@ -44,12 +73,29 @@ internal static class ContainerEmitter
         return sb.ToString();
     }
 
-    private static void EmitJsonNamingAttribute(StringBuilder sb, string propertyName, NamingModel naming)
+    private static void EmitJsonNamingAttribute(
+        StringBuilder sb,
+        TypeGraphNode node,
+        string propertyName,
+        NamingModel naming,
+        JsonContractModel jsonContract
+    )
     {
+        // Check for collection JSON name override first
+        if (jsonContract.CollectionJsonNames.TryGetValue(node.TypeFullName, out var overrideName))
+        {
+            sb.AppendLine(
+                $"    [System.Text.Json.Serialization.JsonPropertyName(\"{overrideName}\")]"
+            );
+            return;
+        }
+
         if (!naming.EmitJsonPropertyNames)
             return;
 
         var camelName = EmitterHelpers.ToCamelCase(propertyName);
-        sb.AppendLine($"    [System.Text.Json.Serialization.JsonPropertyName(\"{camelName}\")]");
+        sb.AppendLine(
+            $"    [System.Text.Json.Serialization.JsonPropertyName(\"{camelName}\")]"
+        );
     }
 }

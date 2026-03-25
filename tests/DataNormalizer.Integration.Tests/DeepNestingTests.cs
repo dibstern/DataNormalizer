@@ -12,13 +12,13 @@ public sealed class DeepNestingTests
         var universe = CreateDeepUniverse();
 
         var result = DeepNestingConfig.Normalize(universe);
-        var root = result.UniverseDtos[0];
+        var root = result.Result;
 
         Assert.That(root, Is.Not.Null);
         Assert.That(root.Name, Is.EqualTo("Observable Universe"));
 
-        // Should have collections for all 7 types
-        Assert.That(result.UniverseDtos, Has.Length.GreaterThanOrEqualTo(1));
+        // Universe is root with NeedsList=false, so no UniverseDtos list — use Result
+        // Should have collections for the other 6 types
         Assert.That(result.GalaxyDtos, Has.Length.GreaterThanOrEqualTo(1));
         Assert.That(result.SolarSystemDtos, Has.Length.GreaterThanOrEqualTo(1));
         Assert.That(result.PlanetDtos, Has.Length.GreaterThanOrEqualTo(1));

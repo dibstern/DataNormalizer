@@ -415,21 +415,23 @@ public sealed class GeneratorEndToEndTests
             .GeneratedSources.First(s => s.hintName.Contains("OrderResultDto"))
             .source;
 
-        // Person container should have Person, Address, PhoneNumber lists
-        Assert.That(personContainerSource, Does.Contain("PersonDtos"));
+        // Person container should have Result property, Address, PhoneNumber lists
+        // Person is root with NeedsList=false, so no PersonDtos list
+        Assert.That(personContainerSource, Does.Contain("Result"));
         Assert.That(personContainerSource, Does.Contain("AddressDtos"));
         Assert.That(personContainerSource, Does.Contain("PhoneNumberDtos"));
         // Person container should NOT have Order list
         Assert.That(personContainerSource, Does.Not.Contain("OrderDto"));
 
-        // Order container should have Order and Address lists
-        Assert.That(orderContainerSource, Does.Contain("OrderDtos"));
+        // Order container should have Result property and Address list
+        // Order is root with NeedsList=false, so no OrderDtos list
+        Assert.That(orderContainerSource, Does.Contain("Result"));
         Assert.That(orderContainerSource, Does.Contain("AddressDtos"));
         // Order container should NOT have Person or PhoneNumber lists
         Assert.That(orderContainerSource, Does.Not.Contain("PersonDto"));
         Assert.That(orderContainerSource, Does.Not.Contain("PhoneNumberDto"));
 
-        // Normalizer: Person's Normalize method should populate Person, Address, PhoneNumber lists only
+        // Normalizer: Person's Normalize method should populate Result, Address, PhoneNumber lists only
         var normalizerSource = result.GeneratedSources.First(s => s.hintName.Contains("Normalizer.g.cs")).source;
         // Extract the Person normalize method (from "Normalize(TestApp.Person" to the next public method or end)
         var personNormalizeStart = normalizerSource.IndexOf("Normalize(TestApp.Person source)");
@@ -438,18 +440,18 @@ public sealed class GeneratorEndToEndTests
             personNormalizeStart,
             orderNormalizeStart - personNormalizeStart
         );
-        Assert.That(personNormalizeMethod, Does.Contain("result.PersonDtos"));
+        Assert.That(personNormalizeMethod, Does.Contain("result.Result"));
         Assert.That(personNormalizeMethod, Does.Contain("result.AddressDtos"));
         Assert.That(personNormalizeMethod, Does.Contain("result.PhoneNumberDtos"));
         Assert.That(personNormalizeMethod, Does.Not.Contain("result.OrderDto"));
 
-        // Order's Normalize method should populate Order and Address lists only
+        // Order's Normalize method should populate Result and Address list only
         var orderNormalizeMethod = normalizerSource.Substring(orderNormalizeStart);
         // Cut it at the first private method
         var privateMethodStart = orderNormalizeMethod.IndexOf("    private static int Normalize");
         if (privateMethodStart > 0)
             orderNormalizeMethod = orderNormalizeMethod.Substring(0, privateMethodStart);
-        Assert.That(orderNormalizeMethod, Does.Contain("result.OrderDtos"));
+        Assert.That(orderNormalizeMethod, Does.Contain("result.Result"));
         Assert.That(orderNormalizeMethod, Does.Contain("result.AddressDtos"));
         Assert.That(orderNormalizeMethod, Does.Not.Contain("result.PersonDto"));
         Assert.That(orderNormalizeMethod, Does.Not.Contain("result.PhoneNumberDto"));
