@@ -40,6 +40,15 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true
     );
 
+    public static readonly DiagnosticDescriptor UnparsedConfigStatement = new(
+        id: "DN1001",
+        title: "Unparsed configuration statement",
+        messageFormat: "Configuration statement could not be parsed and will be ignored: '{0}'",
+        category: "DataNormalizer",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
+
     public static readonly DiagnosticDescriptor DuplicateCollectionType = new(
         id: "DN1002",
         title: "Duplicate Collection<T> type",

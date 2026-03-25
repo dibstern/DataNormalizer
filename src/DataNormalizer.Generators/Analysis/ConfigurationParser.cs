@@ -79,12 +79,28 @@ internal static class ConfigurationParser
                     break;
 
                 case ExpressionStatementSyntax exprStmt when exprStmt.Expression is InvocationExpressionSyntax inv:
-                    ProcessTopLevelInvocation(inv, context);
+                    if (!ProcessTopLevelInvocation(inv, context) && context.BuilderLambdaDepth > 0)
+                    {
+                        var invText = statement.ToString();
+                        if (invText.Length > 100)
+                            invText = invText.Substring(0, 100) + "...";
+                        context.Diagnostics.Add(new GeneratorDiagnosticInfo("DN1001", invText));
+                    }
                     break;
 
                 case ExpressionStatementSyntax exprStmt
                     when exprStmt.Expression is AssignmentExpressionSyntax assignment:
                     ProcessAssignment(assignment, context);
+                    break;
+
+                default:
+                    if (context.BuilderLambdaDepth > 0)
+                    {
+                        var text = statement.ToString();
+                        if (text.Length > 100)
+                            text = text.Substring(0, 100) + "...";
+                        context.Diagnostics.Add(new GeneratorDiagnosticInfo("DN1001", text));
+                    }
                     break;
             }
         }
@@ -109,9 +125,12 @@ internal static class ConfigurationParser
         }
     }
 
-    private static void ProcessTopLevelInvocation(InvocationExpressionSyntax invocation, ParseContext context)
+    /// <summary>
+    /// Returns true if the invocation was recognized; false if it could not be resolved.
+    /// </summary>
+    private static bool ProcessTopLevelInvocation(InvocationExpressionSyntax invocation, ParseContext context)
     {
-        AnalyzeInvocation(invocation, context);
+        return AnalyzeInvocation(invocation, context) is not null;
     }
 
     /// <summary>
@@ -313,7 +332,15 @@ internal static class ConfigurationParser
                 var body = GetLambdaBody(lambdaArg);
                 if (body is BlockSyntax block)
                 {
-                    ProcessStatements(block.Statements, context);
+                    context.BuilderLambdaDepth++;
+                    try
+                    {
+                        ProcessStatements(block.Statements, context);
+                    }
+                    finally
+                    {
+                        context.BuilderLambdaDepth--;
+                    }
                 }
             }
         }
@@ -445,7 +472,15 @@ internal static class ConfigurationParser
         var body = GetLambdaBody(lambdaArg);
         if (body is BlockSyntax block)
         {
-            ProcessStatements(block.Statements, context);
+            context.BuilderLambdaDepth++;
+            try
+            {
+                ProcessStatements(block.Statements, context);
+            }
+            finally
+            {
+                context.BuilderLambdaDepth--;
+            }
         }
     }
 
@@ -465,6 +500,7 @@ internal static class ConfigurationParser
 
         context.ReceiverMap[lambdaParamName] = ReceiverKind.NamingBuilder;
         context.IsParsingGraphNaming = isGraph;
+        context.BuilderLambdaDepth++;
 
         try
         {
@@ -477,6 +513,7 @@ internal static class ConfigurationParser
         finally
         {
             context.IsParsingGraphNaming = false;
+            context.BuilderLambdaDepth--;
         }
     }
 
@@ -495,7 +532,15 @@ internal static class ConfigurationParser
         var body = GetLambdaBody(lambdaArg);
         if (body is BlockSyntax block)
         {
-            ProcessStatements(block.Statements, context);
+            context.BuilderLambdaDepth++;
+            try
+            {
+                ProcessStatements(block.Statements, context);
+            }
+            finally
+            {
+                context.BuilderLambdaDepth--;
+            }
         }
     }
 
@@ -722,6 +767,12 @@ internal static class ConfigurationParser
         public bool CopySourceAttributes { get; set; }
 
         public bool UseReferenceTrackingForCycles { get; set; }
+
+        /// <summary>
+        /// Tracks how many builder lambda scopes are currently active.
+        /// DN1001 is only emitted when depth > 0 (inside a builder lambda).
+        /// </summary>
+        public int BuilderLambdaDepth { get; set; }
 
         // Global naming values (mutable during parse)
         public string GlobalDtoPrefix { get; set; } = "";

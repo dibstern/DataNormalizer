@@ -985,6 +985,300 @@ public sealed class ConfigurationParserTests
         Assert.That(model.PropertyJsonNameOverrides["TestApp.Order.Customer"], Is.EqualTo("customer"));
     }
 
+    // ---- DN1001: Unparsed Config Statement Tests ----
+
+    [Test]
+    public void Parse_IfStatementInsideLambda_EmitsDN1001()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    if (true) { n.DtoSuffix = "Dto"; }
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void Parse_ConsoleWriteLineInsideLambda_EmitsDN1001()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    System.Console.WriteLine("debug");
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        // Console.WriteLine is an invocation on System.Console, not a known receiver.
+        // The ExpressionStatementSyntax with InvocationExpression will match the invocation
+        // case in ProcessStatements but AnalyzeInvocation returns null (unknown receiver).
+        // That currently falls through without emitting a diagnostic.
+        // After DN1001, it should be captured by the default case.
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void Parse_ForeachInsideLambda_EmitsDN1001()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    foreach (var x in new[] { "a" }) { }
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void Parse_ValidStatements_NoDN1001()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    n.DtoSuffix = "Dto";
+                    n.DtoPrefix = "";
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Is.Empty);
+    }
+
+    [Test]
+    public void Parse_UnrecognizedStatementOutsideLambda_NoDN1001()
+    {
+        // Statements directly in Configure body that don't match are outside any builder lambda.
+        // They should NOT produce DN1001 (only statements inside builder lambdas should).
+        var model = ParseConfig(
+            """
+            var x = 42;
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Is.Empty);
+    }
+
+    [Test]
+    public void Parse_DeeplyNestedLambda_EmitsDN1001()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c =>
+                {
+                    foreach (var x in new[] { "a" }) { }
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void Parse_MultipleUnparsedStatements_MultipleDN1001()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    if (true) { }
+                    foreach (var x in new[] { "a" }) { }
+                    while (false) { }
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Has.Exactly(3).Items);
+    }
+
+    [Test]
+    public void Parse_DuplicateCollectionSameType_StillEmitsDN1002()
+    {
+        // Verify DN1002 still works after DN1001 changes
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c =>
+                {
+                    c.Collection<SearchLine>("lines");
+                    c.Collection<SearchLine>("search_lines");
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1002"), Has.Exactly(1).Items);
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Is.Empty);
+    }
+
+    [Test]
+    public void Parse_AssignmentWithMethodCallRhs_NoDN1001()
+    {
+        // n.DtoSuffix = GetSuffix() matches AssignmentExpressionSyntax — not unparsed
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    n.DtoSuffix = GetSuffix();
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """,
+            extraNamespaceTypes: """
+            namespace TestApp
+            {
+                public static class Helpers
+                {
+                    public static string GetSuffix() => "Dto";
+                }
+            }
+            """
+        );
+
+        // Assignment expressions are recognized even with non-literal RHS
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Is.Empty);
+    }
+
+    [Test]
+    public void Parse_UnparsedStatementInForTypeLambda_EmitsDN1001()
+    {
+        var model = ParseConfig(
+            """
+            builder.ForType<Person>(p =>
+            {
+                if (true) { }
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void Parse_UnparsedStatementInGraphLambda_EmitsDN1001()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                if (true) { }
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void Parse_DN1001_TruncatesLongStatements()
+    {
+        var longStatement = new string('x', 200);
+        var model = ParseConfig(
+            $$"""
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    if ({{longStatement}} == "") { }
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        var dn1001 = model.Diagnostics.Where(d => d.Id == "DN1001").ToArray();
+        Assert.That(dn1001, Has.Length.EqualTo(1));
+        Assert.That(dn1001[0].TypeName.Length, Is.LessThanOrEqualTo(103)); // 100 + "..."
+        Assert.That(dn1001[0].TypeName, Does.EndWith("..."));
+    }
+
+    [Test]
+    public void Parse_UnknownInvocationInsideLambda_EmitsDN1001()
+    {
+        // An invocation on an unknown receiver inside a builder lambda
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseNaming(n =>
+                {
+                    SomeUnknownMethod();
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Diagnostics.Where(d => d.Id == "DN1001"), Has.Exactly(1).Items);
+    }
+
     // ---- Test Helper ----
 
     private static NormalizationModel ParseConfig(

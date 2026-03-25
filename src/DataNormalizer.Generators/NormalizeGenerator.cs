@@ -114,6 +114,9 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             }
         }
 
+        // Forward parser diagnostics (DN1001, DN1002, etc.)
+        diagnostics.AddRange(model.Diagnostics);
+
         // Emit DTO classes (one file per type, scoped by config class to avoid hint name collisions)
         foreach (var node in allNodes)
         {
@@ -202,6 +205,7 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             {
                 "DN0001" => DiagnosticDescriptors.CircularReference,
                 "DN0003" => DiagnosticDescriptors.NoPublicProperties,
+                "DN1001" => DiagnosticDescriptors.UnparsedConfigStatement,
                 "DN1002" => DiagnosticDescriptors.DuplicateCollectionType,
                 _ => DiagnosticDescriptors.ConfigClassMustBePartial,
             };
