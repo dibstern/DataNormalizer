@@ -10,6 +10,8 @@ DataNormalizer emits compiler diagnostics to help you identify configuration iss
 | DN0002 | Error    | Configuration class must be `partial` | Add the `partial` keyword to the class declaration       |
 | DN0003 | Error    | Type has no public properties        | Add public properties or exclude the type                |
 | DN0004 | Info     | Unmapped complex type will be inlined | Use `graph.Inline<T>()` explicitly, or add to the graph  |
+| DN1001 | Error    | Unparsed configuration statement     | Simplify the statement or move it outside the builder lambda |
+| DN1002 | Error    | Duplicate Collection\<T\> type         | Remove the duplicate `Collection<T>()` call                  |
 
 ## DN0001 — Circular reference detected
 
@@ -67,6 +69,27 @@ builder.NormalizeGraph<Person>(graph =>
     graph.Inline<Metadata>(); // explicitly inline
 });
 ```
+
+## DN1001 — Unparsed configuration statement
+
+**Severity:** Error
+
+The source generator encountered a statement inside a builder lambda (`UseNaming`, `UseJsonContract`, `ForType`, etc.) that it could not parse. Only simple property assignments, method calls, and local variable declarations are supported inside builder lambdas.
+
+**Common causes:**
+- `if` statements or other control flow inside builder lambdas
+- Calling non-builder methods (e.g., `Console.WriteLine`)
+- Complex expressions that aren't simple assignments or method calls
+
+**Resolution:** Move non-configuration logic outside the builder lambda, or simplify the statement.
+
+## DN1002 — Duplicate Collection\<T\> type
+
+**Severity:** Error
+
+`Collection<T>()` was called more than once for the same type `T` within a single `UseJsonContract` block.
+
+**Resolution:** Remove the duplicate call. Only one JSON name can be assigned per type.
 
 ## Known constraints
 
