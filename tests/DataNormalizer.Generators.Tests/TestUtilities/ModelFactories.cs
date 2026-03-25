@@ -31,6 +31,26 @@ internal static class ModelFactories
         };
     }
 
+    public static TypeGraphNode CreateNode(
+        string fullName,
+        string name,
+        bool hasCircularReference,
+        bool isRootType,
+        bool needsList,
+        params AnalyzedProperty[] props
+    )
+    {
+        return new TypeGraphNode
+        {
+            TypeFullName = fullName,
+            TypeName = name,
+            Properties = props.ToImmutableArray(),
+            HasCircularReference = hasCircularReference,
+            IsRootType = isRootType,
+            NeedsList = needsList,
+        };
+    }
+
     public static TypeGraphNode CreateFlatNode(string fullName, string name, params string[] simpleProps)
     {
         var props = simpleProps.Select(p => SimpleProp(p, "string", isRef: true)).ToArray();

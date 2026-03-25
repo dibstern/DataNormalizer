@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Linq;
+using DataNormalizer.Generators.Helpers;
 using DataNormalizer.Generators.Models;
 using Microsoft.CodeAnalysis;
 
@@ -9,6 +10,7 @@ internal static class TypeGraphAnalyzer
 {
     public static IReadOnlyList<TypeGraphNode> Analyze(
         INamedTypeSymbol rootType,
+        NormalizationModel model,
         ImmutableHashSet<string> inlinedTypes,
         ImmutableHashSet<string> explicitTypes,
         ImmutableDictionary<string, TypeConfiguration> typeConfigurations,
@@ -26,6 +28,7 @@ internal static class TypeGraphAnalyzer
 
         AnalyzeType(
             rootType,
+            model,
             inlinedTypes,
             explicitTypes,
             typeConfigurations,
@@ -41,11 +44,40 @@ internal static class TypeGraphAnalyzer
             isRoot: true
         );
 
-        return results;
+        // Compute IsRootType and NeedsList
+        if (results.Count == 0)
+            return results;
+
+        var rootNode = results[results.Count - 1]; // root is last (DFS post-order)
+        var rootFqn = rootNode.TypeFullName;
+
+        var rootNeedsList = ComputeRootNeedsList(results, rootFqn);
+
+        // Rebuild results with IsRootType and NeedsList set
+        var finalResults = new List<TypeGraphNode>(results.Count);
+        for (var i = 0; i < results.Count; i++)
+        {
+            var node = results[i];
+            var isRoot = node.TypeFullName == rootFqn;
+            finalResults.Add(
+                new TypeGraphNode
+                {
+                    TypeFullName = node.TypeFullName,
+                    TypeName = node.TypeName,
+                    Properties = node.Properties,
+                    HasCircularReference = node.HasCircularReference,
+                    IsRootType = isRoot,
+                    NeedsList = isRoot ? rootNeedsList : true,
+                }
+            );
+        }
+
+        return finalResults;
     }
 
     private static void AnalyzeType(
         INamedTypeSymbol type,
+        NormalizationModel model,
         ImmutableHashSet<string> inlinedTypes,
         ImmutableHashSet<string> explicitTypes,
         ImmutableDictionary<string, TypeConfiguration> typeConfigurations,
@@ -88,6 +120,7 @@ internal static class TypeGraphAnalyzer
             var propType = prop.Type;
             var propTypeFullName = GetFullyQualifiedName(propType, fqnCache);
             var isNullable = false;
+            var jsonNameOverride = ResolveJsonNameOverride(prop, typeFullName, model);
 
             // Unwrap Nullable<T> for classification
             var unwrappedType = UnwrapNullable(propType, out isNullable);
@@ -114,6 +147,7 @@ internal static class TypeGraphAnalyzer
                             SourceAttributes = copySourceAttributes
                                 ? GetPropertyAttributes(prop)
                                 : ImmutableArray<string>.Empty,
+                            JsonNameOverride = jsonNameOverride,
                         }
                     );
                     continue;
@@ -143,6 +177,7 @@ internal static class TypeGraphAnalyzer
                             SourceAttributes = copySourceAttributes
                                 ? GetPropertyAttributes(prop)
                                 : ImmutableArray<string>.Empty,
+                            JsonNameOverride = jsonNameOverride,
                         }
                     );
                     continue;
@@ -155,6 +190,7 @@ internal static class TypeGraphAnalyzer
                     {
                         AnalyzeType(
                             elementNamedType,
+                            model,
                             inlinedTypes,
                             explicitTypes,
                             typeConfigurations,
@@ -186,6 +222,7 @@ internal static class TypeGraphAnalyzer
                         SourceAttributes = copySourceAttributes
                             ? GetPropertyAttributes(prop)
                             : ImmutableArray<string>.Empty,
+                        JsonNameOverride = jsonNameOverride,
                     }
                 );
                 continue;
@@ -206,6 +243,7 @@ internal static class TypeGraphAnalyzer
                         SourceAttributes = copySourceAttributes
                             ? GetPropertyAttributes(prop)
                             : ImmutableArray<string>.Empty,
+                        JsonNameOverride = jsonNameOverride,
                     }
                 );
                 continue;
@@ -231,6 +269,7 @@ internal static class TypeGraphAnalyzer
                         SourceAttributes = copySourceAttributes
                             ? GetPropertyAttributes(prop)
                             : ImmutableArray<string>.Empty,
+                        JsonNameOverride = jsonNameOverride,
                     }
                 );
                 continue;
@@ -251,6 +290,7 @@ internal static class TypeGraphAnalyzer
                         SourceAttributes = copySourceAttributes
                             ? GetPropertyAttributes(prop)
                             : ImmutableArray<string>.Empty,
+                        JsonNameOverride = jsonNameOverride,
                     }
                 );
                 continue;
@@ -263,6 +303,7 @@ internal static class TypeGraphAnalyzer
                 {
                     AnalyzeType(
                         namedPropType,
+                        model,
                         inlinedTypes,
                         explicitTypes,
                         typeConfigurations,
@@ -289,6 +330,7 @@ internal static class TypeGraphAnalyzer
                             SourceAttributes = copySourceAttributes
                                 ? GetPropertyAttributes(prop)
                                 : ImmutableArray<string>.Empty,
+                            JsonNameOverride = jsonNameOverride,
                         }
                     );
                 }
@@ -307,6 +349,7 @@ internal static class TypeGraphAnalyzer
                             SourceAttributes = copySourceAttributes
                                 ? GetPropertyAttributes(prop)
                                 : ImmutableArray<string>.Empty,
+                            JsonNameOverride = jsonNameOverride,
                         }
                     );
                 }
@@ -326,6 +369,7 @@ internal static class TypeGraphAnalyzer
                         SourceAttributes = copySourceAttributes
                             ? GetPropertyAttributes(prop)
                             : ImmutableArray<string>.Empty,
+                        JsonNameOverride = jsonNameOverride,
                     }
                 );
             }
@@ -625,6 +669,43 @@ internal static class TypeGraphAnalyzer
         }
 
         return attrs.ToImmutable();
+    }
+
+    private static string? ResolveJsonNameOverride(
+        IPropertySymbol prop,
+        string typeFullName,
+        NormalizationModel model
+    )
+    {
+        var propKey = FqnHelper.BuildPropertyKey(typeFullName, prop.Name);
+        if (model.PropertyJsonNameOverrides.TryGetValue(propKey, out var configOverride))
+            return configOverride;
+
+        var jsonNameAttr = prop.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.Name == "NormalizeJsonNameAttribute");
+        if (jsonNameAttr?.ConstructorArguments.Length > 0)
+        {
+            var attrValue = jsonNameAttr.ConstructorArguments[0].Value as string;
+            return string.IsNullOrEmpty(attrValue) ? null : attrValue;
+        }
+
+        return null;
+    }
+
+    private static bool ComputeRootNeedsList(List<TypeGraphNode> allNodes, string rootFqn)
+    {
+        foreach (var node in allNodes)
+        {
+            foreach (var prop in node.Properties)
+            {
+                if (prop.Kind == PropertyKind.Normalized && prop.TypeFullName == rootFqn)
+                    return true;
+                if (prop.Kind == PropertyKind.Collection && prop.CollectionElementTypeFullName == rootFqn)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static string GetFullyQualifiedName(ITypeSymbol type, Dictionary<ISymbol, string> cache)

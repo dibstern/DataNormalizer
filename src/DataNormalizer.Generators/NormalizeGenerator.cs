@@ -77,6 +77,7 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
 
             var nodes = TypeGraphAnalyzer.Analyze(
                 rootType.TypeSymbol,
+                model,
                 model.InlinedTypes,
                 model.ExplicitTypes,
                 model.TypeConfigurations,

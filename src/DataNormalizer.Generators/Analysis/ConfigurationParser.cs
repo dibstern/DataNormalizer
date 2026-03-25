@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using DataNormalizer.Generators.Helpers;
 using DataNormalizer.Generators.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -224,7 +225,7 @@ internal static class ConfigurationParser
                 var jsonName = ExtractStringArgument(invocation);
                 if (typeFqn != null && jsonName != null)
                 {
-                    var normalizedFqn = NormalizeFqn(
+                    var normalizedFqn = FqnHelper.NormalizeFqn(
                         typeFqn.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                     );
                     if (!context.SeenCollectionTypes.Add(normalizedFqn))
@@ -272,7 +273,7 @@ internal static class ConfigurationParser
         var typeSymbol = GetTypeArgumentSymbol(memberAccess, context.SemanticModel);
         if (typeSymbol is not null)
         {
-            var fqn = NormalizeFqn(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            var fqn = FqnHelper.NormalizeFqn(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
             context.RootTypes.Add(new RootTypeInfo { TypeSymbol = typeSymbol, FullyQualifiedName = fqn });
         }
 
@@ -292,7 +293,7 @@ internal static class ConfigurationParser
         if (typeSymbol is null)
             return;
 
-        var fqn = NormalizeFqn(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        var fqn = FqnHelper.NormalizeFqn(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
 
         context.ExplicitTypes.Add(fqn);
         EnsureTypeConfig(fqn, context);
@@ -324,7 +325,7 @@ internal static class ConfigurationParser
         if (typeSymbol is null)
             return;
 
-        var fqn = NormalizeFqn(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        var fqn = FqnHelper.NormalizeFqn(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
         context.InlinedTypes.Add(fqn);
     }
 
@@ -674,11 +675,6 @@ internal static class ConfigurationParser
             MemberAccessExpressionSyntax memberAccess => memberAccess.Name.Identifier.Text,
             _ => null,
         };
-    }
-
-    private static string NormalizeFqn(string fqn)
-    {
-        return fqn.StartsWith("global::", StringComparison.Ordinal) ? fqn.Substring("global::".Length) : fqn;
     }
 
     private static void EnsureTypeConfig(string typeFqn, ParseContext context)

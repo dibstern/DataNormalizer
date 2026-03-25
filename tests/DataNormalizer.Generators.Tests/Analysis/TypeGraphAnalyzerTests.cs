@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using DataNormalizer.Generators.Analysis;
+using DataNormalizer.Generators.Helpers;
 using DataNormalizer.Generators.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -10,6 +11,8 @@ namespace DataNormalizer.Generators.Tests.Analysis;
 [TestFixture]
 public sealed class TypeGraphAnalyzerTests
 {
+    private static readonly NormalizationModel EmptyModel = new();
+
     [Test]
     public void Analyze_SimpleFlatType_AllPropertiesSimple()
     {
@@ -26,6 +29,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -53,6 +57,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -78,6 +83,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -101,6 +107,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -126,6 +133,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -152,6 +160,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -183,6 +192,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -219,6 +229,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -249,6 +260,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -277,6 +289,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -305,6 +318,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -333,6 +347,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -364,6 +379,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -393,6 +409,7 @@ public sealed class TypeGraphAnalyzerTests
         var inlinedTypes = ImmutableHashSet.Create("TestApp.Metadata");
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             inlinedTypes,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -425,6 +442,7 @@ public sealed class TypeGraphAnalyzerTests
         var explicitTypes = ImmutableHashSet.Create("TestApp.Address");
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             explicitTypes,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -457,6 +475,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -483,6 +502,7 @@ public sealed class TypeGraphAnalyzerTests
         var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -506,6 +526,7 @@ public sealed class TypeGraphAnalyzerTests
         var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -530,6 +551,7 @@ public sealed class TypeGraphAnalyzerTests
         var (_, rootType) = CompileAndGetType(source, "TestApp.Item");
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -555,6 +577,7 @@ public sealed class TypeGraphAnalyzerTests
         var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -575,6 +598,7 @@ public sealed class TypeGraphAnalyzerTests
         var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -612,6 +636,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             typeConfigs.ToImmutable(),
@@ -651,6 +676,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             typeConfigs.ToImmutable(),
@@ -678,6 +704,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -712,6 +739,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -748,6 +776,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -775,6 +804,7 @@ public sealed class TypeGraphAnalyzerTests
 
         var nodes = TypeGraphAnalyzer.Analyze(
             rootType,
+            EmptyModel,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableDictionary<string, TypeConfiguration>.Empty,
@@ -785,6 +815,445 @@ public sealed class TypeGraphAnalyzerTests
         {
             Assert.That(node.HasCircularReference, Is.True, $"{node.TypeName} should be marked as circular");
         }
+    }
+
+    // ---- [NormalizeJsonName] attribute tests ----
+
+    [Test]
+    public void Analyze_PropertyWithNormalizeJsonNameAttribute_SetsJsonNameOverride()
+    {
+        var source = """
+            namespace TestApp;
+            [System.AttributeUsage(System.AttributeTargets.Property)]
+            public sealed class NormalizeJsonNameAttribute : System.Attribute
+            {
+                public string Name { get; }
+                public NormalizeJsonNameAttribute(string name) => Name = name;
+            }
+            public class Address
+            {
+                [NormalizeJsonName("line")]
+                public string Street { get; set; } = "";
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Address");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var prop = nodes[0].Properties.Single(p => p.Name == "Street");
+        Assert.That(prop.JsonNameOverride, Is.EqualTo("line"));
+    }
+
+    [Test]
+    public void Analyze_PropertyWithBothAttributeAndConfigOverride_ConfigWins()
+    {
+        var source = """
+            namespace TestApp;
+            [System.AttributeUsage(System.AttributeTargets.Property)]
+            public sealed class NormalizeJsonNameAttribute : System.Attribute
+            {
+                public string Name { get; }
+                public NormalizeJsonNameAttribute(string name) => Name = name;
+            }
+            public class Address
+            {
+                [NormalizeJsonName("x")]
+                public string Street { get; set; } = "";
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Address");
+
+        var model = new NormalizationModel
+        {
+            PropertyJsonNameOverrides = ImmutableDictionary.CreateRange(
+                new[] { new KeyValuePair<string, string>("TestApp.Address.Street", "y") }
+            ),
+        };
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            model,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var prop = nodes[0].Properties.Single(p => p.Name == "Street");
+        Assert.That(prop.JsonNameOverride, Is.EqualTo("y"));
+    }
+
+    [Test]
+    public void Analyze_PropertyWithAttributeOnly_UsesAttributeValue()
+    {
+        var source = """
+            namespace TestApp;
+            [System.AttributeUsage(System.AttributeTargets.Property)]
+            public sealed class NormalizeJsonNameAttribute : System.Attribute
+            {
+                public string Name { get; }
+                public NormalizeJsonNameAttribute(string name) => Name = name;
+            }
+            public class Person
+            {
+                [NormalizeJsonName("full_name")]
+                public string Name { get; set; } = "";
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var prop = nodes[0].Properties.Single(p => p.Name == "Name");
+        Assert.That(prop.JsonNameOverride, Is.EqualTo("full_name"));
+    }
+
+    [Test]
+    public void Analyze_PropertyWithNeither_JsonNameOverrideIsNull()
+    {
+        var source = """
+            namespace TestApp;
+            public class Person
+            {
+                public string Name { get; set; } = "";
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var prop = nodes[0].Properties.Single(p => p.Name == "Name");
+        Assert.That(prop.JsonNameOverride, Is.Null);
+    }
+
+    [Test]
+    public void Analyze_PropertyWithEmptyStringAttribute_JsonNameOverrideIsNull()
+    {
+        var source = """
+            namespace TestApp;
+            [System.AttributeUsage(System.AttributeTargets.Property)]
+            public sealed class NormalizeJsonNameAttribute : System.Attribute
+            {
+                public string Name { get; }
+                public NormalizeJsonNameAttribute(string name) => Name = name;
+            }
+            public class Person
+            {
+                [NormalizeJsonName("")]
+                public string Name { get; set; } = "";
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var prop = nodes[0].Properties.Single(p => p.Name == "Name");
+        Assert.That(prop.JsonNameOverride, Is.Null);
+    }
+
+    [Test]
+    public void Analyze_NormalizeJsonNameOnNormalizedProperty_OverrideApplies()
+    {
+        var source = """
+            namespace TestApp;
+            [System.AttributeUsage(System.AttributeTargets.Property)]
+            public sealed class NormalizeJsonNameAttribute : System.Attribute
+            {
+                public string Name { get; }
+                public NormalizeJsonNameAttribute(string name) => Name = name;
+            }
+            public class Address { public string Street { get; set; } = ""; }
+            public class Person
+            {
+                [NormalizeJsonName("home")]
+                public Address HomeAddress { get; set; } = new();
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var prop = nodes.Last().Properties.Single(p => p.Name == "HomeAddress");
+        Assert.That(prop.Kind, Is.EqualTo(PropertyKind.Normalized));
+        Assert.That(prop.JsonNameOverride, Is.EqualTo("home"));
+    }
+
+    [Test]
+    public void Analyze_NormalizeJsonNameOnCollectionProperty_OverrideApplies()
+    {
+        var source = """
+            using System.Collections.Generic;
+            namespace TestApp;
+            [System.AttributeUsage(System.AttributeTargets.Property)]
+            public sealed class NormalizeJsonNameAttribute : System.Attribute
+            {
+                public string Name { get; }
+                public NormalizeJsonNameAttribute(string name) => Name = name;
+            }
+            public class PhoneNumber { public string Number { get; set; } = ""; }
+            public class Person
+            {
+                [NormalizeJsonName("phones")]
+                public List<PhoneNumber> PhoneNumbers { get; set; } = new();
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var prop = nodes.Last().Properties.Single(p => p.Name == "PhoneNumbers");
+        Assert.That(prop.Kind, Is.EqualTo(PropertyKind.Collection));
+        Assert.That(prop.JsonNameOverride, Is.EqualTo("phones"));
+    }
+
+    [Test]
+    public void FqnHelper_BuildPropertyKey_MatchesConfigurationParserKeys()
+    {
+        // Verify FqnHelper produces keys in same format as ConfigurationParser
+        var key = FqnHelper.BuildPropertyKey("TestApp.Person", "Name");
+        Assert.That(key, Is.EqualTo("TestApp.Person.Name"));
+
+        // With global:: prefix should be stripped
+        var globalKey = FqnHelper.BuildPropertyKey("global::TestApp.Person", "Name");
+        Assert.That(globalKey, Is.EqualTo("TestApp.Person.Name"));
+    }
+
+    // ---- rootTypeNeedsList tests ----
+
+    [Test]
+    public void Analyze_RootWithBackReference_NeedsListTrue()
+    {
+        var source = """
+            namespace TestApp;
+            public class Child { public Root Parent { get; set; } = new(); }
+            public class Root
+            {
+                public string Name { get; set; } = "";
+                public Child ChildRef { get; set; } = new();
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Root");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var rootNode = nodes.Single(n => n.TypeFullName == "TestApp.Root");
+        Assert.That(rootNode.IsRootType, Is.True);
+        Assert.That(rootNode.NeedsList, Is.True);
+    }
+
+    [Test]
+    public void Analyze_RootWithoutBackReference_NeedsListFalse()
+    {
+        var source = """
+            namespace TestApp;
+            public class Address { public string Street { get; set; } = ""; }
+            public class Person
+            {
+                public string Name { get; set; } = "";
+                public Address HomeAddress { get; set; } = new();
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var rootNode = nodes.Single(n => n.TypeFullName == "TestApp.Person");
+        Assert.That(rootNode.IsRootType, Is.True);
+        Assert.That(rootNode.NeedsList, Is.False);
+    }
+
+    [Test]
+    public void Analyze_NonRootType_NeedsListTrue()
+    {
+        var source = """
+            namespace TestApp;
+            public class Address { public string Street { get; set; } = ""; }
+            public class Person
+            {
+                public string Name { get; set; } = "";
+                public Address HomeAddress { get; set; } = new();
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var addressNode = nodes.Single(n => n.TypeFullName == "TestApp.Address");
+        Assert.That(addressNode.IsRootType, Is.False);
+        Assert.That(addressNode.NeedsList, Is.True);
+    }
+
+    [Test]
+    public void Analyze_RootReferencedViaCollection_NeedsListTrue()
+    {
+        var source = """
+            using System.Collections.Generic;
+            namespace TestApp;
+            public class Child { public List<Root> Parents { get; set; } = new(); }
+            public class Root
+            {
+                public string Name { get; set; } = "";
+                public Child ChildRef { get; set; } = new();
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Root");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var rootNode = nodes.Single(n => n.TypeFullName == "TestApp.Root");
+        Assert.That(rootNode.IsRootType, Is.True);
+        Assert.That(rootNode.NeedsList, Is.True);
+    }
+
+    [Test]
+    public void Analyze_SelfReferencingRoot_NeedsListTrue()
+    {
+        var source = """
+            namespace TestApp;
+            public class TreeNode
+            {
+                public string Label { get; set; } = "";
+                public TreeNode? Parent { get; set; }
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.TreeNode");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var rootNode = nodes.Single(n => n.TypeFullName == "TestApp.TreeNode");
+        Assert.That(rootNode.IsRootType, Is.True);
+        Assert.That(rootNode.NeedsList, Is.True);
+    }
+
+    [Test]
+    public void Analyze_MultipleTypesReferencingRoot_NeedsListTrue()
+    {
+        var source = """
+            namespace TestApp;
+            public class Child1 { public Root Ref { get; set; } = new(); }
+            public class Child2 { public Root Ref { get; set; } = new(); }
+            public class Root
+            {
+                public string Name { get; set; } = "";
+                public Child1 C1 { get; set; } = new();
+                public Child2 C2 { get; set; } = new();
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Root");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        var rootNode = nodes.Single(n => n.TypeFullName == "TestApp.Root");
+        Assert.That(rootNode.IsRootType, Is.True);
+        Assert.That(rootNode.NeedsList, Is.True);
+    }
+
+    [Test]
+    public void Analyze_SimpleFlatType_IsRootTypeTrue()
+    {
+        var source = """
+            namespace TestApp;
+            public class Person
+            {
+                public string Name { get; set; } = "";
+            }
+            """;
+        var (_, rootType) = CompileAndGetType(source, "TestApp.Person");
+
+        var nodes = TypeGraphAnalyzer.Analyze(
+            rootType,
+            EmptyModel,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, TypeConfiguration>.Empty,
+            autoDiscover: true
+        );
+
+        Assert.That(nodes[0].IsRootType, Is.True);
     }
 
     // ---- Test Helper ----

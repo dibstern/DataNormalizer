@@ -8,4 +8,6 @@ internal sealed class TypeGraphNode
     public required string TypeName { get; init; }
     public required ImmutableArray<AnalyzedProperty> Properties { get; init; }
     public bool HasCircularReference { get; init; }
+    public bool IsRootType { get; init; }
+    public bool NeedsList { get; init; }
 }
