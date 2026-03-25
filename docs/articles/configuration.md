@@ -47,7 +47,7 @@ public class Person
 }
 ```
 
-Ignored properties are omitted from the generated `Normalized{TypeName}` class.
+Ignored properties are omitted from the generated `{TypeName}Dto` class.
 
 ## ExplicitOnly mode
 
@@ -84,28 +84,90 @@ Register multiple roots to generate overloaded `Normalize()`/`Denormalize()` met
 ```csharp
 protected override void Configure(NormalizeBuilder builder)
 {
-    builder.NormalizeGraph<Team>();   // → NormalizedTeamResult
-    builder.NormalizeGraph<Order>();  // → NormalizedOrderResult
+    builder.NormalizeGraph<Team>();   // → TeamResultDto
+    builder.NormalizeGraph<Order>();  // → OrderResultDto
 }
 ```
 
 Each root type gets its own `Normalize` and `Denormalize` overload on the configuration class.
 
+## Naming Policy
+
+Control the naming of generated DTO types and their JSON serialization:
+
+```csharp
+builder.UseNaming(n =>
+{
+    n.DtoSuffix = "Dto";          // suffix for DTO types (default: "Dto")
+    n.DtoPrefix = "";              // prefix for DTO types (default: "")
+    n.ContainerSuffix = "Dto";    // suffix for container type (default: "Dto")
+    n.EmitJsonPropertyNames = true; // emit [JsonPropertyName] attributes (default: true)
+});
+```
+
+Naming can be configured globally or per-graph:
+
+```csharp
+builder.NormalizeGraph<Team>(graph =>
+{
+    graph.UseNaming(n => { n.DtoSuffix = "Model"; });
+});
+```
+
+For full details, see [Naming & JSON Contracts](naming-and-contracts.md).
+
+## JSON Contract Customization
+
+Control the JSON wire format of the container:
+
+```csharp
+builder.NormalizeGraph<SearchResponse>(graph =>
+{
+    graph.UseJsonContract(c =>
+    {
+        c.RootPropertyName = "result";
+        c.Collection<Route>("routes");
+        c.Collection<Place>("places");
+    });
+});
+```
+
+Override individual reference property JSON names:
+
+```csharp
+builder.ForType<Hop>(x =>
+{
+    x.Reference(p => p.Carrier).JsonName("carrier");
+});
+```
+
+Or use the `[NormalizeJsonName]` attribute:
+
+```csharp
+public class Hop
+{
+    [NormalizeJsonName("carrier")]
+    public Carrier Carrier { get; set; }
+}
+```
+
+For full details, see [Naming & JSON Contracts](naming-and-contracts.md).
+
 ## Container Result API
 
-Each `NormalizeGraph<T>()` produces a container DTO (`Normalized{RootType}Result`) that provides access to the flat, deduplicated collections as typed arrays:
+Each `NormalizeGraph<T>()` produces a container DTO (`{RootType}ResultDto`) that provides access to the flat, deduplicated collections as typed arrays:
 
 ```csharp
 var result = AppNormalization.Normalize(team);
 
-result.TeamList[0]                       // The root DTO (always at index 0)
-
-result.TeamList                          // NormalizedTeam[] (typed array)
-result.PersonList                        // NormalizedPerson[] (typed array)
-result.AddressList                       // NormalizedAddress[] (typed array)
+result.Result                            // TeamDto — the root DTO
+result.PersonDtos                        // PersonDto[] (typed array)
+result.AddressDtos                       // AddressDto[] (typed array)
 // All collections are typed properties — no string-keyed lookups.
 // The container serializes directly with System.Text.Json.
 ```
+
+The root type is always accessible via `Result`. It only gets a list array (e.g. `TeamDtos`) if other types in the graph reference it; otherwise, the single root is available through `Result` alone.
 
 For full API details, see the [API Reference](../api/index.md).
 
