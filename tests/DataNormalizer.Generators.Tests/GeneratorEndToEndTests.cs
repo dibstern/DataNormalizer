@@ -47,14 +47,14 @@ public sealed class GeneratorEndToEndTests
         Assert.That(
             result.GeneratedSources,
             Has.Count.GreaterThanOrEqualTo(3),
-            "Expected at least 3 generated sources (NormalizedPerson, NormalizedAddress, config methods)"
+            "Expected at least 3 generated sources (PersonDto, AddressDto, config methods)"
         );
 
         var allSource = string.Join("\n", result.GeneratedSources.Select(s => s.source));
 
         // DTO classes
-        Assert.That(allSource, Does.Contain("class NormalizedPerson"));
-        Assert.That(allSource, Does.Contain("class NormalizedAddress"));
+        Assert.That(allSource, Does.Contain("class PersonDto"));
+        Assert.That(allSource, Does.Contain("class AddressDto"));
 
         // Normalize method
         Assert.That(allSource, Does.Contain("Normalize(TestApp.Person source)"));
@@ -102,9 +102,9 @@ public sealed class GeneratorEndToEndTests
         var result = RunGenerator(source);
         var allSource = string.Join("\n", result.GeneratedSources.Select(s => s.source));
 
-        // NormalizedPerson exists, NormalizedMetadata does NOT
-        Assert.That(allSource, Does.Contain("class NormalizedPerson"));
-        Assert.That(allSource, Does.Not.Contain("class NormalizedMetadata"));
+        // PersonDto exists, MetadataDto does NOT
+        Assert.That(allSource, Does.Contain("class PersonDto"));
+        Assert.That(allSource, Does.Not.Contain("class MetadataDto"));
         Assert.That(result.CompilationErrors, Is.Empty);
     }
 
@@ -140,7 +140,7 @@ public sealed class GeneratorEndToEndTests
         var result = RunGenerator(source);
         var allSource = string.Join("\n", result.GeneratedSources.Select(s => s.source));
 
-        Assert.That(allSource, Does.Contain("class NormalizedPerson"));
+        Assert.That(allSource, Does.Contain("class PersonDto"));
         Assert.That(allSource, Does.Contain("Name"));
         // InternalId should NOT appear in the DTO
         Assert.That(allSource, Does.Not.Contain("InternalId"));
@@ -182,7 +182,7 @@ public sealed class GeneratorEndToEndTests
         Assert.That(dn0001[0].Severity, Is.EqualTo(DiagnosticSeverity.Warning));
 
         var allSource = string.Join("\n", result.GeneratedSources.Select(s => s.source));
-        Assert.That(allSource, Does.Contain("class NormalizedTreeNode"));
+        Assert.That(allSource, Does.Contain("class TreeNodeDto"));
         Assert.That(allSource, Does.Contain("var keyDto = new")); // two-DTO pattern for circular types
         Assert.That(allSource, Does.Contain("var fullDto = new")); // full DTO with all properties
         Assert.That(result.CompilationErrors, Is.Empty);
@@ -228,8 +228,8 @@ public sealed class GeneratorEndToEndTests
         Assert.That(allSource, Does.Contain("Normalize(TestApp.Order source)"));
 
         // Address DTO emitted exactly once (check file names)
-        var addressFiles = result.GeneratedSources.Count(s => s.hintName.Contains("NormalizedAddress"));
-        Assert.That(addressFiles, Is.EqualTo(1), "NormalizedAddress should be emitted exactly once");
+        var addressFiles = result.GeneratedSources.Count(s => s.hintName.Contains("AddressDto"));
+        Assert.That(addressFiles, Is.EqualTo(1), "AddressDto should be emitted exactly once");
 
         Assert.That(result.CompilationErrors, Is.Empty);
     }
@@ -332,9 +332,9 @@ public sealed class GeneratorEndToEndTests
 
         var allSource = string.Join("\n", result.GeneratedSources.Select(s => s.source));
         // Verify key structures
-        Assert.That(allSource, Does.Contain("NormalizedPerson"));
-        Assert.That(allSource, Does.Contain("NormalizedAddress"));
-        Assert.That(allSource, Does.Contain("NormalizedPhoneNumber"));
+        Assert.That(allSource, Does.Contain("PersonDto"));
+        Assert.That(allSource, Does.Contain("AddressDto"));
+        Assert.That(allSource, Does.Contain("PhoneNumberDto"));
         Assert.That(allSource, Does.Contain("HomeAddressIndex"));
         Assert.That(allSource, Does.Contain("WorkAddressIndex"));
         Assert.That(allSource, Does.Contain("PhoneNumbersIndices"));
@@ -409,25 +409,25 @@ public sealed class GeneratorEndToEndTests
 
         // Find the container source for Person and Order
         var personContainerSource = result
-            .GeneratedSources.First(s => s.hintName.Contains("NormalizedPersonResult"))
+            .GeneratedSources.First(s => s.hintName.Contains("PersonResultDto"))
             .source;
         var orderContainerSource = result
-            .GeneratedSources.First(s => s.hintName.Contains("NormalizedOrderResult"))
+            .GeneratedSources.First(s => s.hintName.Contains("OrderResultDto"))
             .source;
 
         // Person container should have Person, Address, PhoneNumber lists
-        Assert.That(personContainerSource, Does.Contain("PersonList"));
-        Assert.That(personContainerSource, Does.Contain("AddressList"));
-        Assert.That(personContainerSource, Does.Contain("PhoneNumberList"));
+        Assert.That(personContainerSource, Does.Contain("PersonDtos"));
+        Assert.That(personContainerSource, Does.Contain("AddressDtos"));
+        Assert.That(personContainerSource, Does.Contain("PhoneNumberDtos"));
         // Person container should NOT have Order list
-        Assert.That(personContainerSource, Does.Not.Contain("OrderList"));
+        Assert.That(personContainerSource, Does.Not.Contain("OrderDto"));
 
         // Order container should have Order and Address lists
-        Assert.That(orderContainerSource, Does.Contain("OrderList"));
-        Assert.That(orderContainerSource, Does.Contain("AddressList"));
+        Assert.That(orderContainerSource, Does.Contain("OrderDtos"));
+        Assert.That(orderContainerSource, Does.Contain("AddressDtos"));
         // Order container should NOT have Person or PhoneNumber lists
-        Assert.That(orderContainerSource, Does.Not.Contain("PersonList"));
-        Assert.That(orderContainerSource, Does.Not.Contain("PhoneNumberList"));
+        Assert.That(orderContainerSource, Does.Not.Contain("PersonDto"));
+        Assert.That(orderContainerSource, Does.Not.Contain("PhoneNumberDto"));
 
         // Normalizer: Person's Normalize method should populate Person, Address, PhoneNumber lists only
         var normalizerSource = result.GeneratedSources.First(s => s.hintName.Contains("Normalizer.g.cs")).source;
@@ -438,10 +438,10 @@ public sealed class GeneratorEndToEndTests
             personNormalizeStart,
             orderNormalizeStart - personNormalizeStart
         );
-        Assert.That(personNormalizeMethod, Does.Contain("result.PersonList"));
-        Assert.That(personNormalizeMethod, Does.Contain("result.AddressList"));
-        Assert.That(personNormalizeMethod, Does.Contain("result.PhoneNumberList"));
-        Assert.That(personNormalizeMethod, Does.Not.Contain("result.OrderList"));
+        Assert.That(personNormalizeMethod, Does.Contain("result.PersonDtos"));
+        Assert.That(personNormalizeMethod, Does.Contain("result.AddressDtos"));
+        Assert.That(personNormalizeMethod, Does.Contain("result.PhoneNumberDtos"));
+        Assert.That(personNormalizeMethod, Does.Not.Contain("result.OrderDto"));
 
         // Order's Normalize method should populate Order and Address lists only
         var orderNormalizeMethod = normalizerSource.Substring(orderNormalizeStart);
@@ -449,10 +449,10 @@ public sealed class GeneratorEndToEndTests
         var privateMethodStart = orderNormalizeMethod.IndexOf("    private static int Normalize");
         if (privateMethodStart > 0)
             orderNormalizeMethod = orderNormalizeMethod.Substring(0, privateMethodStart);
-        Assert.That(orderNormalizeMethod, Does.Contain("result.OrderList"));
-        Assert.That(orderNormalizeMethod, Does.Contain("result.AddressList"));
-        Assert.That(orderNormalizeMethod, Does.Not.Contain("result.PersonList"));
-        Assert.That(orderNormalizeMethod, Does.Not.Contain("result.PhoneNumberList"));
+        Assert.That(orderNormalizeMethod, Does.Contain("result.OrderDtos"));
+        Assert.That(orderNormalizeMethod, Does.Contain("result.AddressDtos"));
+        Assert.That(orderNormalizeMethod, Does.Not.Contain("result.PersonDto"));
+        Assert.That(orderNormalizeMethod, Does.Not.Contain("result.PhoneNumberDto"));
 
         // Generated code should compile without errors
         Assert.That(
@@ -479,6 +479,11 @@ public sealed class GeneratorEndToEndTests
         var runtimeAssembly = typeof(DataNormalizer.Attributes.NormalizeConfigurationAttribute).Assembly.Location;
         if (!string.IsNullOrEmpty(runtimeAssembly))
             references.Add(MetadataReference.CreateFromFile(runtimeAssembly));
+
+        // Add System.Text.Json for generated [JsonPropertyName] attributes
+        var jsonAssembly = typeof(System.Text.Json.Serialization.JsonPropertyNameAttribute).Assembly.Location;
+        if (!string.IsNullOrEmpty(jsonAssembly))
+            references.Add(MetadataReference.CreateFromFile(jsonAssembly));
 
         var compilation = CSharpCompilation.Create(
             "TestAssembly",

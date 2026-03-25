@@ -136,6 +136,11 @@ public sealed class GeneratorPerformanceTests
         if (!string.IsNullOrEmpty(runtimeAssembly))
             references.Add(MetadataReference.CreateFromFile(runtimeAssembly));
 
+        // Add System.Text.Json for generated [JsonPropertyName] attributes
+        var jsonAssembly = typeof(System.Text.Json.Serialization.JsonPropertyNameAttribute).Assembly.Location;
+        if (!string.IsNullOrEmpty(jsonAssembly))
+            references.Add(MetadataReference.CreateFromFile(jsonAssembly));
+
         var compilation = CSharpCompilation.Create(
             "TestAssembly",
             [syntaxTree],

@@ -121,13 +121,14 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             if (node.Properties.Length == 0)
                 continue;
 
-            var dtoSource = DtoEmitter.Emit(node, model.CopySourceAttributes, model.JsonNamingPolicy);
+            var dtoSource = DtoEmitter.Emit(node, model.CopySourceAttributes, model.Naming);
             var dtoHintPrefix = string.IsNullOrEmpty(model.ConfigNamespace)
                 ? model.ConfigClassName
                 : $"{model.ConfigNamespace}.{model.ConfigClassName}";
+            var dtoName = EmitterHelpers.GetDtoName(node.TypeName, model.Naming);
             var hintName = string.IsNullOrEmpty(EmitterHelpers.GetNamespace(node.TypeFullName))
-                ? $"{dtoHintPrefix}.Normalized{node.TypeName}.g.cs"
-                : $"{dtoHintPrefix}.{EmitterHelpers.GetNamespace(node.TypeFullName)}.Normalized{node.TypeName}.g.cs";
+                ? $"{dtoHintPrefix}.{dtoName}.g.cs"
+                : $"{dtoHintPrefix}.{EmitterHelpers.GetNamespace(node.TypeFullName)}.{dtoName}.g.cs";
             sources.Add(new GeneratorSourceEntry(hintName, dtoSource));
         }
 
@@ -149,14 +150,15 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             }
             if (rootNode == null)
                 continue;
-            var containerSource = ContainerEmitter.Emit(rootNode, rootNodes, model.JsonNamingPolicy);
+            var containerSource = ContainerEmitter.Emit(rootNode, rootNodes, model.Naming);
             var containerHintPrefix = string.IsNullOrEmpty(model.ConfigNamespace)
                 ? model.ConfigClassName
                 : $"{model.ConfigNamespace}.{model.ConfigClassName}";
             var containerNs = EmitterHelpers.GetNamespace(rootNode.TypeFullName);
+            var containerName = EmitterHelpers.GetContainerName(rootNode.TypeName, model.Naming);
             var containerHintName = string.IsNullOrEmpty(containerNs)
-                ? $"{containerHintPrefix}.Normalized{rootNode.TypeName}Result.g.cs"
-                : $"{containerHintPrefix}.{containerNs}.Normalized{rootNode.TypeName}Result.g.cs";
+                ? $"{containerHintPrefix}.{containerName}.g.cs"
+                : $"{containerHintPrefix}.{containerNs}.{containerName}.g.cs";
             sources.Add(new GeneratorSourceEntry(containerHintName, containerSource));
         }
 
