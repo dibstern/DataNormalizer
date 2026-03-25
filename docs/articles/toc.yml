@@ -4,5 +4,7 @@
   href: configuration.md
 - name: Why Gzip Isn't Enough
   href: why-gzip-isnt-enough.md
+- name: Naming & JSON Contracts
+  href: naming-and-contracts.md
 - name: Diagnostics Reference
   href: diagnostics.md
