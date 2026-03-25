@@ -1,6 +1,6 @@
 # DataNormalizer
 
-A .NET source generator that normalizes nested object graphs into flat, deduplicated, JSON-serializable containers.
+Compile-time graph normalization for .NET. Generate flat, deduplicated API contracts from nested object graphs.
 
 [![CI](https://github.com/dibstern/DataNormalizer/actions/workflows/ci.yml/badge.svg)](https://github.com/dibstern/DataNormalizer/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/DataNormalizer.svg)](https://www.nuget.org/packages/DataNormalizer)
@@ -8,78 +8,94 @@ A .NET source generator that normalizes nested object graphs into flat, deduplic
 
 [Documentation](https://dibstern.github.io/DataNormalizer/) | [API Reference](https://dibstern.github.io/DataNormalizer/api/)
 
-## What It Does
+## The Problem
 
-Given an object graph with shared references:
+APIs that return nested object trees repeat the same entities over and over. A search response with 20 routes through 5 airports serializes each airport up to 40 times. That costs bytes on the wire, redundant parsing work on every client, and hand-written flatten/rehydrate code to clean it up.
 
-```csharp
-var sharedAddress = new Address { City = "Seattle", Zip = "98101" };
+## What DataNormalizer Does
 
-var team = new Team
-{
-    Name = "Engineering",
-    Members = new[]
-    {
-        new Person { Name = "Alice", Home = sharedAddress },
-        new Person { Name = "Bob",   Home = sharedAddress },
-    },
-};
-```
+DataNormalizer is a source generator. You point it at your root type and it produces flat, deduplicated DTOs, a typed container, and `Normalize`/`Denormalize` methods — all at compile time, zero reflection.
 
-One call normalizes the entire graph into a flat, deduplicated container:
-
-```csharp
-var result = AppNormalization.Normalize(team);
-var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
-```
+Given a transport search response with routes, hops, carriers, and places, the normalized JSON looks like this:
 
 ```json
 {
-  "TeamList": [
-    { "Name": "Engineering", "MembersIndices": [0, 1] }
+  "result": {
+    "routesIndices": [0, 1],
+    "originIndex": 0,
+    "destinationIndex": 1
+  },
+  "routeDtos": [
+    { "name": "Fly", "hopsIndices": [0, 1] },
+    { "name": "Train", "hopsIndices": [2] }
   ],
-  "PersonList": [
-    { "Name": "Alice", "HomeIndex": 0 },
-    { "Name": "Bob",   "HomeIndex": 0 }
+  "hopDtos": [
+    { "carrierIndex": 0, "departureIndex": 0, "arrivalIndex": 2, "durationMinutes": 30 },
+    { "carrierIndex": 1, "departureIndex": 2, "arrivalIndex": 1, "durationMinutes": 85 },
+    { "carrierIndex": 2, "departureIndex": 0, "arrivalIndex": 1, "durationMinutes": 660 }
   ],
-  "AddressList": [
-    { "City": "Seattle", "Zip": "98101" }
+  "carrierDtos": [
+    { "name": "SkyBus", "code": "SKYBUS" },
+    { "name": "Qantas", "code": "QF" },
+    { "name": "NSW TrainLink", "code": "XPT" }
+  ],
+  "placeDtos": [
+    { "name": "Melbourne", "lat": -37.814, "lng": 144.963 },
+    { "name": "Sydney", "lat": -33.865, "lng": 151.207 },
+    { "name": "Melbourne Airport", "lat": -37.670, "lng": 144.849 }
   ]
 }
 ```
 
-The shared `Address` is stored once. Nested objects become integer indices into typed arrays. The whole container serializes directly with `System.Text.Json` and is straightforward to reverse on any frontend.
+Melbourne appears once. Carriers are stored once. Each hop references them by index.
 
-## Installation
+## Normalization + Gzip
+
+"Just gzip it" removes syntactic redundancy, but normalization removes *semantic* redundancy first — then gzip compresses what's left even further.
+
+Measured on a real transport search API response:
+
+| Format | Raw | Gzipped |
+|--------|-----|---------|
+| Normalized | 119.0 KB | 22.1 KB |
+| Unnormalized | 254.2 KB | 29.5 KB |
+
+**Raw savings: 135 KB (2.1x smaller). Gzipped savings: 7.4 KB (1.3x smaller).**
+
+Normalize first, gzip second. See [Why Gzip Isn't Enough](https://dibstern.github.io/DataNormalizer/docs/why-gzip-isnt-enough.html) for the full analysis.
+
+## Quick Start
 
 ```
 dotnet add package DataNormalizer
 ```
 
-Supports **.NET 6**, **.NET 7**, **.NET 8**, **.NET 9**, and **.NET 10**.
-
-## Quick Start
-
-### 1. Define your domain types
+### 1. Define your types
 
 ```csharp
-public class Team
+public class SearchResponse
 {
-    public string Name { get; set; }
-    public Person[] Members { get; set; }
+    public Route[] Routes { get; set; }
+    public Place Origin { get; set; }
+    public Place Destination { get; set; }
 }
 
-public class Person
+public class Route
 {
     public string Name { get; set; }
-    public Address Home { get; set; }
+    public Hop[] Hops { get; set; }
 }
 
-public class Address
+public class Hop
 {
-    public string City { get; set; }
-    public string Zip { get; set; }
+    public Carrier Carrier { get; set; }
+    public Place Departure { get; set; }
+    public Place Arrival { get; set; }
+    public int DurationMinutes { get; set; }
 }
+
+public class Carrier { public string Name { get; set; } public string Code { get; set; } }
+public class Place { public string Name { get; set; } public double Lat { get; set; } public double Lng { get; set; } }
 ```
 
 ### 2. Create a configuration class
@@ -93,46 +109,51 @@ public partial class AppNormalization : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
-        builder.NormalizeGraph<Team>();  // discovers Person, Address
+        builder.NormalizeGraph<SearchResponse>(); // discovers Route, Hop, Carrier, Place
     }
 }
 ```
 
-### 3. Normalize, use, and denormalize
+### 3. Normalize and denormalize
 
 ```csharp
-// Normalize
-var result = AppNormalization.Normalize(team);
+var result = AppNormalization.Normalize(searchResponse);
 
-// Access the root entity (always at index 0)
-var root = result.TeamList[0];
-Console.WriteLine(root.Name);             // "Engineering"
-Console.WriteLine(root.MembersIndices);   // [0, 1]
+// Access the root directly
+Console.WriteLine(result.Result.RoutesIndices.Length); // 2
 
-// Access entity lists directly
-Console.WriteLine(result.PersonList.Length);   // 2
-Console.WriteLine(result.AddressList.Length);  // 1 (deduplicated)
+// Access typed collections
+Console.WriteLine(result.RouteDtos.Length);    // 2
+Console.WriteLine(result.CarrierDtos.Length);  // 3 (deduplicated)
+Console.WriteLine(result.PlaceDtos.Length);    // 3 (deduplicated)
 
-// Serialize the entire container to JSON
-var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+// Serialize to JSON
+var json = JsonSerializer.Serialize(result);
 
 // Denormalize back to the original object graph
 var restored = AppNormalization.Denormalize(result);
 ```
 
-The source generator produces `Normalize` and `Denormalize` static methods, per-type DTOs, and the container result class at compile time.
+## When To Use It
 
-## How It Works
+**Good for:**
+- Graph-like data where entities repeat across branches (routes, hops, places)
+- High-volume APIs where payload size and parse time matter
+- Replacing hand-written normalization or ad-hoc deduplication logic
 
-For each `NormalizeGraph<T>()` call, the generator produces:
+**Not ideal for:**
+- Tiny payloads where overhead isn't meaningful
+- Simple flat lists with no shared references
+- Very specific legacy wire formats you can't change
 
-1. **Per-type DTOs** (`Normalized{TypeName}`) — partial classes implementing `IEquatable<T>` for value-based deduplication. Nested object references become `int` indices (`{Name}Index`), collections become `int[]` (`{Name}Indices`).
+## Documentation
 
-2. **A container result** (`Normalized{TypeName}Result`) — holds a `{TypeName}List` array for every entity type in the graph. The root entity is always at index 0 in the root type's list. This is the primary output of `Normalize()` and the input to `Denormalize()`.
-
-3. **`Normalize(T)` / `Denormalize(Normalized{T}Result)`** — static methods on the configuration class.
-
-All generated types are `partial`, so you can extend them with additional members.
+- [Getting Started](https://dibstern.github.io/DataNormalizer/docs/getting-started.html)
+- [Configuration Guide](https://dibstern.github.io/DataNormalizer/docs/configuration-guide.html)
+- [Naming & JSON Contracts](https://dibstern.github.io/DataNormalizer/docs/naming-and-json-contracts.html)
+- [Why Gzip Isn't Enough](https://dibstern.github.io/DataNormalizer/docs/why-gzip-isnt-enough.html)
+- [Diagnostics Reference](https://dibstern.github.io/DataNormalizer/docs/diagnostics-reference.html)
+- [API Reference](https://dibstern.github.io/DataNormalizer/api/)
 
 ## Target Frameworks
 
@@ -140,118 +161,6 @@ All generated types are `partial`, so you can extend them with additional member
 |---|---|
 | Runtime library | `net6.0`, `net7.0`, `net8.0`, `net9.0`, `net10.0` |
 | Source generator | `netstandard2.0` (Roslyn requirement, bundled in NuGet package) |
-
-The generator runs at compile time regardless of your target framework. The runtime library provides the `NormalizationContext` used internally by generated code.
-
-## Configuration Options
-
-### Auto-discovery
-
-`NormalizeGraph<T>()` walks the type graph starting from `T` and discovers all referenced complex types automatically.
-
-```csharp
-builder.NormalizeGraph<Team>();  // discovers Person, Address, etc.
-```
-
-### Opt-out (Inline)
-
-Keep a type inline instead of normalizing it into a separate collection:
-
-```csharp
-builder.NormalizeGraph<Person>(graph =>
-{
-    graph.Inline<Metadata>(); // Metadata stays nested, not extracted
-});
-```
-
-### Ignore a property
-
-Exclude a property from the generated DTO:
-
-```csharp
-builder.ForType<Person>(p => p.IgnoreProperty(x => x.Secret));
-```
-
-Or use the attribute:
-
-```csharp
-public class Person
-{
-    public string Name { get; set; }
-
-    [NormalizeIgnore]
-    public string Secret { get; set; }
-}
-```
-
-### ExplicitOnly mode
-
-Only include properties that are explicitly opted-in:
-
-```csharp
-builder.ForType<Person>(p =>
-{
-    p.UsePropertyMode(PropertyMode.ExplicitOnly);
-    p.IncludeProperty(x => x.Name);
-});
-```
-
-Or use attributes:
-
-```csharp
-public class Person
-{
-    [NormalizeInclude]
-    public string Name { get; set; }
-
-    public string NotIncluded { get; set; }
-}
-```
-
-### Multiple root types
-
-Register multiple roots to generate separate container types and `Normalize()`/`Denormalize()` overloads:
-
-```csharp
-protected override void Configure(NormalizeBuilder builder)
-{
-    builder.NormalizeGraph<Team>();   // → NormalizedTeamResult
-    builder.NormalizeGraph<Order>();  // → NormalizedOrderResult
-}
-```
-
-Each container includes only the entity lists reachable from its root type.
-
-## Reversing Normalized Data
-
-Any consumer (frontend, API client, other language) can reconstruct the original object graph from the serialized container:
-
-1. Parse JSON into the container shape
-2. Reconstruct leaf entities from their lists
-3. Reconstruct composite entities by resolving index references into entity lists
-4. The root entity is always at index 0 in the root type's list
-
-Shared references are preserved: multiple indices pointing to the same list entry reconstruct as the same object reference.
-
-## Circular References
-
-- The generator detects cycles at compile time and emits a **DN0001** warning.
-- Suppress with `<NoWarn>$(NoWarn);DN0001</NoWarn>` in your `.csproj` if the cycle is intentional.
-- Normalization handles cycles correctly via value-equality-based deduplication.
-- Denormalization uses a two-pass approach: create all objects first, then resolve references.
-
-## Diagnostics
-
-| ID     | Severity | Description                          | Resolution                                               |
-| ------ | -------- | ------------------------------------ | -------------------------------------------------------- |
-| DN0001 | Warning  | Circular reference detected          | Add `<NoWarn>DN0001</NoWarn>` if intentional             |
-| DN0002 | Error    | Configuration class must be `partial` | Add the `partial` keyword to the class declaration       |
-| DN0003 | Error    | Type has no public properties        | Add public properties or exclude the type                |
-| DN0004 | Info     | Unmapped complex type will be inlined | Use `graph.Inline<T>()` explicitly, or add to the graph  |
-
-## Known Constraints
-
-- For circular types, back-edge properties (those creating the cycle) use shape-based comparison (null/non-null, collection count) rather than full structural comparison. All non-circular properties — including nested complex subtrees — are fully compared. False dedup only occurs if two objects in a cycle have identical simple properties, identical non-circular subtree structure, AND identical circular reference shapes.
 
 ## License
 
