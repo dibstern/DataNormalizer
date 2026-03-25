@@ -57,10 +57,10 @@ Measured on a real transport search API response:
 
 | Format | Raw | Gzipped |
 |--------|-----|---------|
-| Normalized | 119.0 KB | 22.1 KB |
-| Unnormalized | 254.2 KB | 29.5 KB |
+| Normalized | 345 KB | 58 KB |
+| Unnormalized | 713 KB | 121 KB |
 
-**Raw savings: 135 KB (2.1x smaller). Gzipped savings: 7.4 KB (1.3x smaller).**
+**Raw savings: 368 KB (2.1x smaller). Gzipped savings: 63 KB (2.1x smaller).**
 
 Normalize first, gzip second. See [Why Gzip Isn't Enough](https://dibstern.github.io/DataNormalizer/docs/why-gzip-isnt-enough.html) for the full analysis.
 

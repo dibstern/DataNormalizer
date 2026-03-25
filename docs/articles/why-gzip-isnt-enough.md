@@ -12,20 +12,20 @@ Measured on a real transport search API response (Melbourne to Sydney route sear
 
 | Format       | Raw      | Gzipped  | Ratio vs Normalized |
 |--------------|----------|----------|---------------------|
-| Normalized   | 119.0 KB | 22.1 KB  | 1.0x                |
-| Unnormalized | 254.2 KB | 29.5 KB  | 1.3x                |
+| Normalized   | 345 KB   | 58 KB    | 1.0x                |
+| Unnormalized | 713 KB   | 121 KB   | 2.1x                |
 
-Raw savings: **135 KB** (53%).
-Gzipped savings: **7.4 KB** (25%).
+Raw savings: **368 KB** (52%).
+Gzipped savings: **63 KB** (52%).
 
 ### Pretty-printed JSON
 
-| Format       | Raw      | Gzipped  | Ratio vs Normalized |
-|--------------|----------|----------|---------------------|
-| Normalized   | 187.9 KB | 23.9 KB  | 1.0x                |
-| Unnormalized | 562.8 KB | 39.4 KB  | 1.6x                |
+| Format       | Raw       | Gzipped  | Ratio vs Normalized |
+|--------------|-----------|----------|---------------------|
+| Normalized   | 538 KB    | 65 KB    | 1.0x                |
+| Unnormalized | 1,482 KB  | 150 KB   | 2.3x                |
 
-Gzip closes the gap but does not eliminate it. Even after compression, the normalized payload is consistently smaller.
+Gzip closes the gap but does not eliminate it. Even after compression, the normalized payload is **2.1x smaller**.
 
 ## Why gzip doesn't fully cancel normalization
 
