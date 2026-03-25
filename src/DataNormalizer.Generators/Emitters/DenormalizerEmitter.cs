@@ -44,7 +44,7 @@ internal static class DenormalizerEmitter
                 var rootSpecificNodes = perRootNodes.ContainsKey(rootType.FullyQualifiedName)
                     ? perRootNodes[rootType.FullyQualifiedName]
                     : allNodes;
-                EmitDenormalizeMethod(sb, rootType, rootNode, rootSpecificNodes);
+                EmitDenormalizeMethod(sb, rootType, rootNode, rootSpecificNodes, model.Naming);
                 emittedRootCount++;
             }
         }
@@ -57,15 +57,16 @@ internal static class DenormalizerEmitter
         StringBuilder sb,
         RootTypeInfo rootType,
         TypeGraphNode rootNode,
-        IReadOnlyList<TypeGraphNode> allNodes
+        IReadOnlyList<TypeGraphNode> allNodes,
+        NamingModel naming
     )
     {
-        var containerFullName = EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName);
+        var containerFullName = EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName, naming);
         sb.AppendLine($"    public static {rootType.FullyQualifiedName} Denormalize({containerFullName} normalized)");
         sb.AppendLine("    {");
 
         // Collect all DTO collections
-        EmitGetCollections(sb, allNodes);
+        EmitGetCollections(sb, allNodes, naming);
         sb.AppendLine();
 
         // Pass 1: Create all source objects, populate simple + inlined properties
@@ -82,13 +83,18 @@ internal static class DenormalizerEmitter
         sb.AppendLine("    }");
     }
 
-    private static void EmitGetCollections(StringBuilder sb, IReadOnlyList<TypeGraphNode> allNodes)
+    private static void EmitGetCollections(
+        StringBuilder sb,
+        IReadOnlyList<TypeGraphNode> allNodes,
+        NamingModel naming
+    )
     {
         for (var i = 0; i < allNodes.Count; i++)
         {
             var node = allNodes[i];
             var camel = EmitterHelpers.ToCamelCase(node.TypeName);
-            sb.AppendLine($"        var {camel}Dtos = normalized.{node.TypeName}List;");
+            var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, naming);
+            sb.AppendLine($"        var {camel}Dtos = normalized.{listPropertyName};");
         }
     }
 

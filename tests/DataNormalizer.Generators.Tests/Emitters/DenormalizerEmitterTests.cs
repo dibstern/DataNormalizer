@@ -16,7 +16,7 @@ public sealed class DenormalizerEmitterTests
         var result = DenormalizerEmitter.Emit(model, nodes);
 
         Assert.That(result, Does.Contain("public static TestApp.Person Denormalize("));
-        Assert.That(result, Does.Contain("TestApp.NormalizedPersonResult normalized"));
+        Assert.That(result, Does.Contain("TestApp.PersonResultDto normalized"));
     }
 
     [Test]
@@ -120,8 +120,8 @@ public sealed class DenormalizerEmitterTests
         var (model, nodes) = CreatePersonWithAddressScenario();
         var result = DenormalizerEmitter.Emit(model, nodes);
 
-        Assert.That(result, Does.Contain("normalized.PersonList"));
-        Assert.That(result, Does.Contain("normalized.AddressList"));
+        Assert.That(result, Does.Contain("normalized.PersonDtos"));
+        Assert.That(result, Does.Contain("normalized.AddressDtos"));
     }
 
     [Test]
@@ -153,8 +153,8 @@ public sealed class DenormalizerEmitterTests
 
         var result = DenormalizerEmitter.Emit(model, new[] { personNode, treeNode });
 
-        Assert.That(result, Does.Contain("Denormalize(TestApp.NormalizedPersonResult normalized)"));
-        Assert.That(result, Does.Contain("Denormalize(TestApp.NormalizedTreeNodeResult normalized)"));
+        Assert.That(result, Does.Contain("Denormalize(TestApp.PersonResultDto normalized)"));
+        Assert.That(result, Does.Contain("Denormalize(TestApp.TreeNodeResultDto normalized)"));
     }
 
     [Test]
@@ -194,7 +194,7 @@ public sealed class DenormalizerEmitterTests
         var result = DenormalizerEmitter.Emit(model, new[] { personNode });
 
         // Container properties use TypeName, not custom name
-        Assert.That(result, Does.Contain("normalized.PersonList"));
+        Assert.That(result, Does.Contain("normalized.PersonDtos"));
         Assert.That(result, Does.Not.Contain("GetCollection"));
     }
 
