@@ -22,10 +22,7 @@ public sealed class DtoEmitterTests
 
         var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
-        Assert.That(
-            result,
-            Does.Contain("public partial class PersonDto : System.IEquatable<PersonDto>")
-        );
+        Assert.That(result, Does.Contain("public partial class PersonDto : System.IEquatable<PersonDto>"));
         Assert.That(result, Does.Contain("[System.CodeDom.Compiler.GeneratedCode(\"DataNormalizer\""));
         Assert.That(result, Does.Contain("namespace TestApp;"));
         Assert.That(result, Does.Contain("public string Name { get; set; }"));
@@ -582,19 +579,12 @@ public sealed class DtoEmitterTests
     [Test]
     public void Emit_CustomPrefixNoSuffix_ClassNamedMyPerson()
     {
-        var node = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var node = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
 
         var naming = new NamingModel { DtoPrefix = "My", DtoSuffix = "" };
         var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: naming);
 
-        Assert.That(
-            result,
-            Does.Contain("public partial class MyPerson : System.IEquatable<MyPerson>")
-        );
+        Assert.That(result, Does.Contain("public partial class MyPerson : System.IEquatable<MyPerson>"));
         Assert.That(result, Does.Contain("public bool Equals(MyPerson? other)"));
         Assert.That(result, Does.Contain("obj is MyPerson other"));
     }
@@ -602,11 +592,7 @@ public sealed class DtoEmitterTests
     [Test]
     public void Emit_NormalizedPrefix_ClassNamedNormalizedPerson()
     {
-        var node = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var node = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
 
         var naming = new NamingModel { DtoPrefix = "Normalized", DtoSuffix = "" };
         var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: naming);
@@ -731,11 +717,7 @@ public sealed class DtoEmitterTests
     [Test]
     public void Emit_PropertyWithNoOverride_UsesDefaultCamelCase()
     {
-        var node = CreateNode(
-            "TestApp.Person",
-            "Person",
-            NormalizedProp("Line", "TestApp.Line", nullable: false)
-        );
+        var node = CreateNode("TestApp.Person", "Person", NormalizedProp("Line", "TestApp.Line", nullable: false));
 
         var result = DtoEmitter.Emit(
             node,

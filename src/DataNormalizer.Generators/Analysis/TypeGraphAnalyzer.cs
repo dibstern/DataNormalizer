@@ -671,11 +671,7 @@ internal static class TypeGraphAnalyzer
         return attrs.ToImmutable();
     }
 
-    private static string? ResolveJsonNameOverride(
-        IPropertySymbol prop,
-        string typeFullName,
-        NormalizationModel model
-    )
+    private static string? ResolveJsonNameOverride(IPropertySymbol prop, string typeFullName, NormalizationModel model)
     {
         var propKey = FqnHelper.BuildPropertyKey(typeFullName, prop.Name);
         if (model.PropertyJsonNameOverrides.TryGetValue(propKey, out var configOverride))

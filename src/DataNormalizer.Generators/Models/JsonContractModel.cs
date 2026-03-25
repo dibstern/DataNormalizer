@@ -22,10 +22,7 @@ internal sealed class JsonContractModel : IEquatable<JsonContractModel>
             return false;
         foreach (var kvp in CollectionJsonNames)
         {
-            if (
-                !other.CollectionJsonNames.TryGetValue(kvp.Key, out var otherVal)
-                || kvp.Value != otherVal
-            )
+            if (!other.CollectionJsonNames.TryGetValue(kvp.Key, out var otherVal) || kvp.Value != otherVal)
                 return false;
         }
         return true;

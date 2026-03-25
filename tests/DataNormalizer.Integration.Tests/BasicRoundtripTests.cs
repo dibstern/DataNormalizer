@@ -206,11 +206,7 @@ public sealed class BasicRoundtripTests
         {
             Name = "Bob",
             Age = 25,
-            HomeAddress = new TestTypes.CustomSuffix.Location
-            {
-                Street = "456 Oak Ave",
-                City = "Capital City",
-            },
+            HomeAddress = new TestTypes.CustomSuffix.Location { Street = "456 Oak Ave", City = "Capital City" },
         };
 
         var result = CustomSuffixNamingConfig.Normalize(contact);

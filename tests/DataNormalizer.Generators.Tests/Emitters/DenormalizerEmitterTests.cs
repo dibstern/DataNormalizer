@@ -275,11 +275,7 @@ public sealed class DenormalizerEmitterTests
             SimpleProp("Name", "string", isRef: true),
             NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
         );
-        var addressNode = CreateNode(
-            "TestApp.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
 
         var result = DenormalizerEmitter.Emit(model, new[] { personNode, addressNode });
@@ -301,11 +297,7 @@ public sealed class DenormalizerEmitterTests
             SimpleProp("Name", "string", isRef: true),
             NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
         );
-        var addressNode = CreateNode(
-            "TestApp.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
 
         var result = DenormalizerEmitter.Emit(model, new[] { personNode, addressNode });

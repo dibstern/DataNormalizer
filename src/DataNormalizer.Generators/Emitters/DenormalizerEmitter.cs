@@ -61,7 +61,11 @@ internal static class DenormalizerEmitter
         NamingModel naming
     )
     {
-        var containerFullName = EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName, naming);
+        var containerFullName = EmitterHelpers.GetContainerFullName(
+            rootType.FullyQualifiedName,
+            rootNode.TypeName,
+            naming
+        );
         sb.AppendLine($"    public static {rootType.FullyQualifiedName} Denormalize({containerFullName} normalized)");
         sb.AppendLine("    {");
 
@@ -83,11 +87,7 @@ internal static class DenormalizerEmitter
         sb.AppendLine("    }");
     }
 
-    private static void EmitGetCollections(
-        StringBuilder sb,
-        IReadOnlyList<TypeGraphNode> allNodes,
-        NamingModel naming
-    )
+    private static void EmitGetCollections(StringBuilder sb, IReadOnlyList<TypeGraphNode> allNodes, NamingModel naming)
     {
         for (var i = 0; i < allNodes.Count; i++)
         {

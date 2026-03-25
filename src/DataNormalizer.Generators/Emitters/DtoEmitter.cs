@@ -84,9 +84,7 @@ internal static class DtoEmitter
         // If JsonNameOverride is set (non-null, non-empty), always emit it — even when EmitJsonPropertyNames is false
         if (!string.IsNullOrEmpty(prop.JsonNameOverride))
         {
-            sb.AppendLine(
-                $"    [System.Text.Json.Serialization.JsonPropertyName(\"{prop.JsonNameOverride}\")]"
-            );
+            sb.AppendLine($"    [System.Text.Json.Serialization.JsonPropertyName(\"{prop.JsonNameOverride}\")]");
             return;
         }
 

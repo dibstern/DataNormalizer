@@ -20,14 +20,11 @@ public sealed class SearchContractTests
             Lng = lng,
         };
 
-    private static SearchCarrier MakeCarrier(string name, string code) =>
-        new() { Name = name, Code = code };
+    private static SearchCarrier MakeCarrier(string name, string code) => new() { Name = name, Code = code };
 
-    private static SearchVehicle MakeVehicle(string name, string kind) =>
-        new() { Name = name, Kind = kind };
+    private static SearchVehicle MakeVehicle(string name, string kind) => new() { Name = name, Kind = kind };
 
-    private static SearchImage MakeImage(string title, string url) =>
-        new() { Title = title, ThumbnailUrl = url };
+    private static SearchImage MakeImage(string title, string url) => new() { Title = title, ThumbnailUrl = url };
 
     private static SearchResponse CreateSearchResponse()
     {
@@ -173,11 +170,7 @@ public sealed class SearchContractTests
         // Reference().JsonName("vehicle") → "vehicle" instead of "vehicleIndex"
         Assert.That(hop.TryGetProperty("vehicle", out _), Is.True, "Hop should have 'vehicle' property");
         // ReferenceCollection().JsonName("transitImages") → "transitImages" instead of "transitImagesIndices"
-        Assert.That(
-            hop.TryGetProperty("transitImages", out _),
-            Is.True,
-            "Hop should have 'transitImages' property"
-        );
+        Assert.That(hop.TryGetProperty("transitImages", out _), Is.True, "Hop should have 'transitImages' property");
     }
 
     [Test]
@@ -449,11 +442,7 @@ public sealed class SearchContractTests
 
     private static TransportNetwork CreateTransportNetwork()
     {
-        var network = new TransportNetwork
-        {
-            NetworkName = "London Underground",
-            Region = "London",
-        };
+        var network = new TransportNetwork { NetworkName = "London Underground", Region = "London" };
 
         var station1 = new TransportStation
         {

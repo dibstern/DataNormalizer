@@ -72,7 +72,11 @@ internal static class NormalizerEmitter
         IReadOnlyList<TypeGraphNode> allNodes
     )
     {
-        var containerFullName = EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName, model.Naming);
+        var containerFullName = EmitterHelpers.GetContainerFullName(
+            rootType.FullyQualifiedName,
+            rootNode.TypeName,
+            model.Naming
+        );
 
         sb.AppendLine($"    public static {containerFullName} Normalize({rootType.FullyQualifiedName} source)");
         sb.AppendLine("    {");

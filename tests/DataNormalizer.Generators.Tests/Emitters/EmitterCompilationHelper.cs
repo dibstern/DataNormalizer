@@ -38,20 +38,17 @@ internal static class EmitterCompilationHelper
             "EmitterTest",
             trees,
             BaseReferences,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithNullableContextOptions(NullableContextOptions.Enable)
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithNullableContextOptions(
+                NullableContextOptions.Enable
+            )
         );
 
-        var diagnostics = compilation
-            .GetDiagnostics()
-            .Where(d => d.Severity == DiagnosticSeverity.Error)
-            .ToArray();
+        var diagnostics = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
 
         Assert.That(
             diagnostics,
             Is.Empty,
-            () =>
-                $"Generated code has compilation errors:\n{string.Join("\n", diagnostics.Select(d => d.ToString()))}"
+            () => $"Generated code has compilation errors:\n{string.Join("\n", diagnostics.Select(d => d.ToString()))}"
         );
     }
 
@@ -75,14 +72,12 @@ internal static class EmitterCompilationHelper
             "EmitterTest",
             trees,
             BaseReferences,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithNullableContextOptions(NullableContextOptions.Enable)
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithNullableContextOptions(
+                NullableContextOptions.Enable
+            )
         );
 
-        var diagnostics = compilation
-            .GetDiagnostics()
-            .Where(d => d.Severity == DiagnosticSeverity.Error)
-            .ToArray();
+        var diagnostics = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
 
         Assert.That(diagnostics, Is.Not.Empty, "Expected compilation errors but code compiled successfully");
     }

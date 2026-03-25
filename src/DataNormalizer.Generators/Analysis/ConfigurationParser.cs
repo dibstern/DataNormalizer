@@ -55,8 +55,7 @@ internal static class ConfigurationParser
                 DtoPrefix = context.GraphDtoPrefix ?? context.GlobalDtoPrefix,
                 DtoSuffix = context.GraphDtoSuffix ?? context.GlobalDtoSuffix,
                 ContainerSuffix = context.GraphContainerSuffix ?? context.GlobalContainerSuffix,
-                EmitJsonPropertyNames =
-                    context.GraphEmitJsonPropertyNames ?? context.GlobalEmitJsonPropertyNames,
+                EmitJsonPropertyNames = context.GraphEmitJsonPropertyNames ?? context.GlobalEmitJsonPropertyNames,
             },
             JsonContract = new JsonContractModel
             {

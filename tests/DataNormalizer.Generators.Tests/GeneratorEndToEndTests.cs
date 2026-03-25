@@ -408,12 +408,8 @@ public sealed class GeneratorEndToEndTests
         var result = RunGenerator(source);
 
         // Find the container source for Person and Order
-        var personContainerSource = result
-            .GeneratedSources.First(s => s.hintName.Contains("PersonResultDto"))
-            .source;
-        var orderContainerSource = result
-            .GeneratedSources.First(s => s.hintName.Contains("OrderResultDto"))
-            .source;
+        var personContainerSource = result.GeneratedSources.First(s => s.hintName.Contains("PersonResultDto")).source;
+        var orderContainerSource = result.GeneratedSources.First(s => s.hintName.Contains("OrderResultDto")).source;
 
         // Person container should have Result property, Address, PhoneNumber lists
         // Person is root with NeedsList=false, so no PersonDtos list

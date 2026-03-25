@@ -46,11 +46,7 @@ public sealed class JsonNamingTests
         {
             Name = "Alice",
             Age = 30,
-            HomeAddress = new TestTypes.NoJsonNaming.Location
-            {
-                Street = "123 Main St",
-                City = "Springfield",
-            },
+            HomeAddress = new TestTypes.NoJsonNaming.Location { Street = "123 Main St", City = "Springfield" },
         };
 
         var result = NoJsonNamingConfig.Normalize(contact);
@@ -74,20 +70,13 @@ public sealed class JsonNamingTests
         {
             Name = "Alice",
             Age = 30,
-            HomeAddress = new TestTypes.CustomSuffix.Location
-            {
-                Street = "123 Main St",
-                City = "Springfield",
-            },
+            HomeAddress = new TestTypes.CustomSuffix.Location { Street = "123 Main St", City = "Springfield" },
         };
 
         var result = CustomSuffixNamingConfig.Normalize(contact);
 
         // Container type is ContactResultDto (ContainerSuffix unchanged = "Dto")
-        Assert.That(
-            result.GetType().Name,
-            Is.EqualTo("ContactResultDto")
-        );
+        Assert.That(result.GetType().Name, Is.EqualTo("ContactResultDto"));
     }
 
     [Test]
@@ -97,11 +86,7 @@ public sealed class JsonNamingTests
         {
             Name = "Alice",
             Age = 30,
-            HomeAddress = new TestTypes.CustomSuffix.Location
-            {
-                Street = "123 Main St",
-                City = "Springfield",
-            },
+            HomeAddress = new TestTypes.CustomSuffix.Location { Street = "123 Main St", City = "Springfield" },
         };
 
         var result = CustomSuffixNamingConfig.Normalize(contact);
@@ -124,11 +109,7 @@ public sealed class JsonNamingTests
         {
             Name = "Alice",
             Age = 30,
-            HomeAddress = new TestTypes.DtoPrefix.Location
-            {
-                Street = "123 Main St",
-                City = "Springfield",
-            },
+            HomeAddress = new TestTypes.DtoPrefix.Location { Street = "123 Main St", City = "Springfield" },
         };
 
     [Test]
@@ -177,11 +158,7 @@ public sealed class JsonNamingTests
         {
             Name = "Alice",
             Age = 30,
-            HomeAddress = new TestTypes.ContainerSuffix.Location
-            {
-                Street = "123 Main St",
-                City = "Springfield",
-            },
+            HomeAddress = new TestTypes.ContainerSuffix.Location { Street = "123 Main St", City = "Springfield" },
         };
 
     [Test]
@@ -213,11 +190,7 @@ public sealed class JsonNamingTests
         {
             Name = "Alice",
             Age = 30,
-            HomeAddress = new TestTypes.GraphNaming.Location
-            {
-                Street = "123 Main St",
-                City = "Springfield",
-            },
+            HomeAddress = new TestTypes.GraphNaming.Location { Street = "123 Main St", City = "Springfield" },
         };
 
     [Test]

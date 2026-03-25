@@ -26,10 +26,7 @@ public sealed class NormalizerEmitterTests
         var result = NormalizerEmitter.Emit(model, nodes);
 
         // Public Normalize method returns container type
-        Assert.That(
-            result,
-            Does.Contain("public static TestApp.PersonResultDto Normalize(TestApp.Person source)")
-        );
+        Assert.That(result, Does.Contain("public static TestApp.PersonResultDto Normalize(TestApp.Person source)"));
         // Populates entity lists on container
         Assert.That(result, Does.Not.Contain("RootIndex"));
         Assert.That(result, Does.Contain("result.PersonDtos = "));
@@ -344,14 +341,8 @@ public sealed class NormalizerEmitterTests
         Assert.That(result, Does.Contain("Normalize(TestApp.Person source)"));
         Assert.That(result, Does.Contain("Normalize(TestApp.TreeNode source)"));
         // Each returns its own container type
-        Assert.That(
-            result,
-            Does.Contain("public static TestApp.PersonResultDto Normalize(TestApp.Person source)")
-        );
-        Assert.That(
-            result,
-            Does.Contain("public static TestApp.TreeNodeResultDto Normalize(TestApp.TreeNode source)")
-        );
+        Assert.That(result, Does.Contain("public static TestApp.PersonResultDto Normalize(TestApp.Person source)"));
+        Assert.That(result, Does.Contain("public static TestApp.TreeNodeResultDto Normalize(TestApp.TreeNode source)"));
     }
 
     [Test]
@@ -389,10 +380,7 @@ public sealed class NormalizerEmitterTests
         var result = NormalizerEmitter.Emit(model, nodes);
 
         // Returns container type, not NormalizedResult<T>
-        Assert.That(
-            result,
-            Does.Contain("public static TestApp.OrderResultDto Normalize(TestApp.Order source)")
-        );
+        Assert.That(result, Does.Contain("public static TestApp.OrderResultDto Normalize(TestApp.Order source)"));
         Assert.That(result, Does.Contain("var context = new DataNormalizer.Runtime.NormalizationContext(1);"));
         Assert.That(result, Does.Contain("NormalizeOrder(source, context);"));
         // Creates container and populates it
@@ -844,18 +832,15 @@ public sealed class NormalizerEmitterTests
         var jsonContract = new JsonContractModel
         {
             RootPropertyName = "searchResult",
-            CollectionJsonNames = System.Collections.Immutable.ImmutableDictionary<string, string>
-                .Empty.Add("TestApp.Address", "addresses"),
+            CollectionJsonNames = System.Collections.Immutable.ImmutableDictionary<string, string>.Empty.Add(
+                "TestApp.Address",
+                "addresses"
+            ),
         };
 
         var personDto = DtoEmitter.Emit(personNode, copySourceAttributes: false, naming: naming);
         var addressDto = DtoEmitter.Emit(addressNode, copySourceAttributes: false, naming: naming);
-        var container = ContainerEmitter.Emit(
-            personNode,
-            new[] { personNode, addressNode },
-            naming,
-            jsonContract
-        );
+        var container = ContainerEmitter.Emit(personNode, new[] { personNode, addressNode }, naming, jsonContract);
         var normalizer = NormalizerEmitter.Emit(model, new[] { personNode, addressNode });
         var denormalizer = DenormalizerEmitter.Emit(model, new[] { personNode, addressNode });
 

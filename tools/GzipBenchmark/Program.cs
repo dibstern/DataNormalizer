@@ -39,15 +39,18 @@ var routes = doc["routes"]!.AsArray();
 
 JsonNode? Lookup(JsonArray table, JsonNode? index)
 {
-    if (index is null) return null;
+    if (index is null)
+        return null;
     var i = index.GetValue<int>();
-    if (i < 0 || i >= table.Count) return null;
+    if (i < 0 || i >= table.Count)
+        return null;
     return table[i]!.DeepClone();
 }
 
 JsonArray? LookupArray(JsonArray table, JsonNode? indices)
 {
-    if (indices is null) return null;
+    if (indices is null)
+        return null;
     var arr = new JsonArray();
     foreach (var idx in indices.AsArray())
     {
@@ -177,11 +180,7 @@ foreach (var r in routes)
     if (er.ContainsKey("places"))
         er["places"] = LookupArray(expandedPlaces, er["places"]);
     // Expand hotelInfo.centerPlace
-    if (
-        er.ContainsKey("hotelInfo")
-        && er["hotelInfo"] is JsonObject hotelInfo
-        && hotelInfo.ContainsKey("centerPlace")
-    )
+    if (er.ContainsKey("hotelInfo") && er["hotelInfo"] is JsonObject hotelInfo && hotelInfo.ContainsKey("centerPlace"))
     {
         var centerNode = Lookup(expandedPlaces, hotelInfo["centerPlace"]);
         if (centerNode != null)
@@ -238,12 +237,8 @@ foreach (var prop in doc.AsObject())
     }
 }
 
-var unnormalizedMinified = unnormalized.ToJsonString(
-    new JsonSerializerOptions { WriteIndented = false }
-);
-var unnormalizedPretty = unnormalized.ToJsonString(
-    new JsonSerializerOptions { WriteIndented = true }
-);
+var unnormalizedMinified = unnormalized.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+var unnormalizedPretty = unnormalized.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
 
 // === MEASURE SIZES ===
 static int GzipSize(string text)
@@ -269,9 +264,7 @@ Console.WriteLine("## Minified JSON");
 Console.WriteLine();
 Console.WriteLine("| Format | Raw | Gzipped | Ratio vs Normalized |");
 Console.WriteLine("|--------|-----|---------|---------------------|");
-Console.WriteLine(
-    $"| Normalized | {normMinRaw / 1024.0:F1} KB | {normMinGz / 1024.0:F1} KB | 1.0x |"
-);
+Console.WriteLine($"| Normalized | {normMinRaw / 1024.0:F1} KB | {normMinGz / 1024.0:F1} KB | 1.0x |");
 Console.WriteLine(
     $"| Unnormalized | {unnormMinRaw / 1024.0:F1} KB | {unnormMinGz / 1024.0:F1} KB | {(double)unnormMinGz / normMinGz:F1}x |"
 );
@@ -280,9 +273,7 @@ Console.WriteLine("## Pretty-printed JSON");
 Console.WriteLine();
 Console.WriteLine("| Format | Raw | Gzipped | Ratio vs Normalized |");
 Console.WriteLine("|--------|-----|---------|---------------------|");
-Console.WriteLine(
-    $"| Normalized | {normPrettyRaw / 1024.0:F1} KB | {normPrettyGz / 1024.0:F1} KB | 1.0x |"
-);
+Console.WriteLine($"| Normalized | {normPrettyRaw / 1024.0:F1} KB | {normPrettyGz / 1024.0:F1} KB | 1.0x |");
 Console.WriteLine(
     $"| Unnormalized | {unnormPrettyRaw / 1024.0:F1} KB | {unnormPrettyGz / 1024.0:F1} KB | {(double)unnormPrettyGz / normPrettyGz:F1}x |"
 );

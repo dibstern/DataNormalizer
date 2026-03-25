@@ -26,11 +26,7 @@ public sealed class ContainerEmitterTests
             SimpleProp("Name", "string", isRef: true),
             NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
         );
-        var addressNode = CreateNode(
-            "TestApp.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, addressNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, DefaultNaming, JsonContractModel.Default);
@@ -69,34 +65,20 @@ public sealed class ContainerEmitterTests
             isRootType: true,
             SimpleProp("Name", "string", isRef: true)
         );
-        var addressNode = CreateNode(
-            "TestApp.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, addressNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, DefaultNaming, JsonContractModel.Default);
 
         Assert.That(result, Does.Not.Contain("rootIndex"));
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"personDtos\")]")
-        );
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"addressDtos\")]")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"personDtos\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"addressDtos\")]"));
     }
 
     [Test]
     public void Emit_Namespace_ContainerEmittedInRootTypeNamespace()
     {
-        var personNode = CreateNode(
-            "TestApp.Models.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Models.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming, JsonContractModel.Default);
@@ -107,11 +89,7 @@ public sealed class ContainerEmitterTests
     [Test]
     public void Emit_NoIEquatable_ContainerDoesNotImplementIEquatable()
     {
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming, JsonContractModel.Default);
@@ -141,29 +119,18 @@ public sealed class ContainerEmitterTests
     [Test]
     public void Emit_GeneratedCodeAttribute_Present()
     {
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming, JsonContractModel.Default);
 
-        Assert.That(
-            result,
-            Does.Contain("[System.CodeDom.Compiler.GeneratedCode(\"DataNormalizer\", \"1.0.0\")]")
-        );
+        Assert.That(result, Does.Contain("[System.CodeDom.Compiler.GeneratedCode(\"DataNormalizer\", \"1.0.0\")]"));
     }
 
     [Test]
     public void Emit_NullableEnable_Present()
     {
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming, JsonContractModel.Default);
@@ -185,11 +152,7 @@ public sealed class ContainerEmitterTests
     [Test]
     public void Emit_ZeroPropertyType_StillGetsEntityList()
     {
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var emptyNode = CreateNode("TestApp.Marker", "Marker");
         var allNodes = new List<TypeGraphNode> { personNode, emptyNode };
 
@@ -218,30 +181,15 @@ public sealed class ContainerEmitterTests
         var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming, JsonContractModel.Default);
 
         // Result property always gets JsonPropertyName even when EmitJsonPropertyNames=false
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"result\")]")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"result\")]"));
     }
 
     [Test]
     public void Emit_DuplicateTypeNames_DisambiguatesWithNamespace()
     {
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
-        var acmeAddress = CreateNode(
-            "Acme.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
-        var contosoAddress = CreateNode(
-            "Contoso.Address",
-            "Address",
-            SimpleProp("City", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var acmeAddress = CreateNode("Acme.Address", "Address", SimpleProp("Street", "string", isRef: true));
+        var contosoAddress = CreateNode("Contoso.Address", "Address", SimpleProp("City", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, acmeAddress, contosoAddress };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming, JsonContractModel.Default);
@@ -259,48 +207,22 @@ public sealed class ContainerEmitterTests
     [Test]
     public void Emit_DuplicateTypeNames_WithJsonNames_DisambiguatesJsonPropertyNames()
     {
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
-        var acmeAddress = CreateNode(
-            "Acme.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
-        var contosoAddress = CreateNode(
-            "Contoso.Address",
-            "Address",
-            SimpleProp("City", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var acmeAddress = CreateNode("Acme.Address", "Address", SimpleProp("Street", "string", isRef: true));
+        var contosoAddress = CreateNode("Contoso.Address", "Address", SimpleProp("City", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, acmeAddress, contosoAddress };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, DefaultNaming, JsonContractModel.Default);
 
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"acmeAddressDtos\")]")
-        );
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"contosoAddressDtos\")]")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"acmeAddressDtos\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"contosoAddressDtos\")]"));
     }
 
     [Test]
     public void Emit_UniqueTypeNames_KeepsSimplePropertyNames()
     {
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
-        var addressNode = CreateNode(
-            "TestApp.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, addressNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming, JsonContractModel.Default);
@@ -339,11 +261,7 @@ public sealed class ContainerEmitterTests
             DtoSuffix = "",
             EmitJsonPropertyNames = false,
         };
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, naming, JsonContractModel.Default);
@@ -360,11 +278,7 @@ public sealed class ContainerEmitterTests
             DtoSuffix = "",
             EmitJsonPropertyNames = false,
         };
-        var personNode = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
         var result = ContainerEmitter.Emit(personNode, allNodes, naming, JsonContractModel.Default);
@@ -389,14 +303,8 @@ public sealed class ContainerEmitterTests
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, DefaultNaming, JsonContractModel.Default);
 
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"result\")]")
-        );
-        Assert.That(
-            result,
-            Does.Contain("public TestApp.PersonDto Result { get; set; } = default!;")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"result\")]"));
+        Assert.That(result, Does.Contain("public TestApp.PersonDto Result { get; set; } = default!;"));
 
         var stubs = new[] { "namespace TestApp { public class PersonDto { } }" };
         EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
@@ -416,10 +324,7 @@ public sealed class ContainerEmitterTests
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, NoJsonNaming, JsonContractModel.Default);
 
-        Assert.That(
-            result,
-            Does.Contain("public TestApp.Models.PersonDto Result { get; set; } = default!;")
-        );
+        Assert.That(result, Does.Contain("public TestApp.Models.PersonDto Result { get; set; } = default!;"));
     }
 
     // ---- New Tests: NeedsList ----
@@ -434,11 +339,7 @@ public sealed class ContainerEmitterTests
             isRootType: true,
             SimpleProp("Name", "string", isRef: true)
         );
-        var addressNode = CreateNode(
-            "TestApp.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { rootNode, addressNode };
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, NoJsonNaming, JsonContractModel.Default);
@@ -486,10 +387,7 @@ public sealed class ContainerEmitterTests
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, DefaultNaming, jsonContract);
 
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"searchResult\")]")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"searchResult\")]"));
         Assert.That(result, Does.Contain("Result { get; set; } = default!;"));
 
         var stubs = new[] { "namespace TestApp { public class PersonDto { } }" };
@@ -511,10 +409,7 @@ public sealed class ContainerEmitterTests
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, DefaultNaming, jsonContract);
 
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"result\")]")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"result\")]"));
     }
 
     // ---- New Tests: CollectionJsonNames overrides ----
@@ -529,24 +424,16 @@ public sealed class ContainerEmitterTests
             isRootType: true,
             SimpleProp("Name", "string", isRef: true)
         );
-        var routeNode = CreateNode(
-            "TestApp.Route",
-            "Route",
-            SimpleProp("Path", "string", isRef: true)
-        );
+        var routeNode = CreateNode("TestApp.Route", "Route", SimpleProp("Path", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { rootNode, routeNode };
         var jsonContract = new JsonContractModel
         {
-            CollectionJsonNames = ImmutableDictionary<string, string>
-                .Empty.Add("TestApp.Route", "routes"),
+            CollectionJsonNames = ImmutableDictionary<string, string>.Empty.Add("TestApp.Route", "routes"),
         };
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, DefaultNaming, jsonContract);
 
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"routes\")]")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"routes\")]"));
 
         var stubs = new[]
         {
@@ -569,8 +456,7 @@ public sealed class ContainerEmitterTests
         var allNodes = new List<TypeGraphNode> { rootNode };
         var jsonContract = new JsonContractModel
         {
-            CollectionJsonNames = ImmutableDictionary<string, string>
-                .Empty.Add("TestApp.NonExistent", "whatever"),
+            CollectionJsonNames = ImmutableDictionary<string, string>.Empty.Add("TestApp.NonExistent", "whatever"),
         };
 
         // Should not crash
@@ -589,20 +475,13 @@ public sealed class ContainerEmitterTests
             isRootType: true,
             SimpleProp("Name", "string", isRef: true)
         );
-        var addressNode = CreateNode(
-            "TestApp.Address",
-            "Address",
-            SimpleProp("Street", "string", isRef: true)
-        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { rootNode, addressNode };
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, DefaultNaming, JsonContractModel.Default);
 
         // No override for Address, so default camelCase
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"addressDtos\")]")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"addressDtos\")]"));
     }
 
     [Test]
@@ -619,14 +498,8 @@ public sealed class ContainerEmitterTests
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, NoJsonNaming, JsonContractModel.Default);
 
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"result\")]")
-        );
-        Assert.That(
-            result,
-            Does.Contain("public TestApp.PersonDto Result { get; set; } = default!;")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"result\")]"));
+        Assert.That(result, Does.Contain("public TestApp.PersonDto Result { get; set; } = default!;"));
     }
 
     [Test]
@@ -639,16 +512,8 @@ public sealed class ContainerEmitterTests
             isRootType: true,
             SimpleProp("Name", "string", isRef: true)
         );
-        var routeNode = CreateNode(
-            "TestApp.Route",
-            "Route",
-            SimpleProp("Path", "string", isRef: true)
-        );
-        var stopNode = CreateNode(
-            "TestApp.Stop",
-            "Stop",
-            SimpleProp("Name", "string", isRef: true)
-        );
+        var routeNode = CreateNode("TestApp.Route", "Route", SimpleProp("Path", "string", isRef: true));
+        var stopNode = CreateNode("TestApp.Stop", "Stop", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { rootNode, routeNode, stopNode };
         var jsonContract = new JsonContractModel
         {
@@ -659,14 +524,8 @@ public sealed class ContainerEmitterTests
 
         var result = ContainerEmitter.Emit(rootNode, allNodes, DefaultNaming, jsonContract);
 
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"routes\")]")
-        );
-        Assert.That(
-            result,
-            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"stops\")]")
-        );
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"routes\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"stops\")]"));
     }
 
     // ---- Helpers ----

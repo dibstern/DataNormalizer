@@ -34,17 +34,11 @@ internal static class ContainerEmitter
         sb.AppendLine("{");
 
         // Always emit the Result property for the root type
-        var rootDtoFullName = EmitterHelpers.GetDtoFullName(
-            rootNode.TypeFullName,
-            rootNode.TypeName,
-            naming
-        );
+        var rootDtoFullName = EmitterHelpers.GetDtoFullName(rootNode.TypeFullName, rootNode.TypeName, naming);
         var rootJsonName = string.IsNullOrEmpty(jsonContract.RootPropertyName)
             ? "result"
             : jsonContract.RootPropertyName;
-        sb.AppendLine(
-            $"    [System.Text.Json.Serialization.JsonPropertyName(\"{rootJsonName}\")]"
-        );
+        sb.AppendLine($"    [System.Text.Json.Serialization.JsonPropertyName(\"{rootJsonName}\")]");
         sb.AppendLine($"    public {rootDtoFullName} Result {{ get; set; }} = default!;");
 
         // Emit list properties for each node
@@ -56,11 +50,7 @@ internal static class ContainerEmitter
             if (node.IsRootType && !node.NeedsList)
                 continue;
 
-            var dtoFullName = EmitterHelpers.GetDtoFullName(
-                node.TypeFullName,
-                node.TypeName,
-                naming
-            );
+            var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName, naming);
             var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, naming);
 
             EmitJsonNamingAttribute(sb, node, listPropertyName, naming, jsonContract);
@@ -84,9 +74,7 @@ internal static class ContainerEmitter
         // Check for collection JSON name override first
         if (jsonContract.CollectionJsonNames.TryGetValue(node.TypeFullName, out var overrideName))
         {
-            sb.AppendLine(
-                $"    [System.Text.Json.Serialization.JsonPropertyName(\"{overrideName}\")]"
-            );
+            sb.AppendLine($"    [System.Text.Json.Serialization.JsonPropertyName(\"{overrideName}\")]");
             return;
         }
 
@@ -94,8 +82,6 @@ internal static class ContainerEmitter
             return;
 
         var camelName = EmitterHelpers.ToCamelCase(propertyName);
-        sb.AppendLine(
-            $"    [System.Text.Json.Serialization.JsonPropertyName(\"{camelName}\")]"
-        );
+        sb.AppendLine($"    [System.Text.Json.Serialization.JsonPropertyName(\"{camelName}\")]");
     }
 }
