@@ -72,7 +72,7 @@ internal static class NormalizerEmitter
         IReadOnlyList<TypeGraphNode> allNodes
     )
     {
-        var containerFullName = EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName);
+        var containerFullName = EmitterHelpers.GetContainerFullName(rootType.FullyQualifiedName, rootNode.TypeName, model.Naming);
 
         sb.AppendLine($"    public static {containerFullName} Normalize({rootType.FullyQualifiedName} source)");
         sb.AppendLine("    {");
@@ -84,15 +84,16 @@ internal static class NormalizerEmitter
         for (var i = 0; i < allNodes.Count; i++)
         {
             var node = allNodes[i];
-            var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName);
+            var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, node.TypeName, model.Naming);
             var typeKey = EmitterHelpers.GetTypeKey(node, model);
             var camel = EmitterHelpers.ToCamelCase(node.TypeName);
+            var listPropertyName = EmitterHelpers.GetListPropertyName(node, allNodes, model.Naming);
 
             sb.AppendLine($"        var __{camel}Col = context.GetCollection<{dtoFullName}>(\"{typeKey}\");");
             sb.AppendLine($"        var __{camel}Arr = new {dtoFullName}[__{camel}Col.Count];");
             sb.AppendLine($"        for (var __i = 0; __i < __{camel}Col.Count; __i++)");
             sb.AppendLine($"            __{camel}Arr[__i] = __{camel}Col[__i];");
-            sb.AppendLine($"        result.{node.TypeName}List = __{camel}Arr;");
+            sb.AppendLine($"        result.{listPropertyName} = __{camel}Arr;");
         }
 
         sb.AppendLine("        return result;");
@@ -103,7 +104,7 @@ internal static class NormalizerEmitter
     {
         var typeName = node.TypeName;
         var typeKey = EmitterHelpers.GetTypeKey(node, model);
-        var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, typeName);
+        var dtoFullName = EmitterHelpers.GetDtoFullName(node.TypeFullName, typeName, model.Naming);
 
         sb.AppendLine(
             $"    private static int Normalize{typeName}({node.TypeFullName} source, DataNormalizer.Runtime.NormalizationContext context)"

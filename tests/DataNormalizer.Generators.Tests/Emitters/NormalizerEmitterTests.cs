@@ -28,11 +28,11 @@ public sealed class NormalizerEmitterTests
         // Public Normalize method returns container type
         Assert.That(
             result,
-            Does.Contain("public static TestApp.NormalizedPersonResult Normalize(TestApp.Person source)")
+            Does.Contain("public static TestApp.PersonResultDto Normalize(TestApp.Person source)")
         );
         // Populates entity lists on container
         Assert.That(result, Does.Not.Contain("RootIndex"));
-        Assert.That(result, Does.Contain("result.PersonList = "));
+        Assert.That(result, Does.Contain("result.PersonDtos = "));
         Assert.That(result, Does.Contain("return result;"));
         // Helper method
         Assert.That(
@@ -83,8 +83,8 @@ public sealed class NormalizerEmitterTests
         Assert.That(result, Does.Contain("dto.Street = source.Street;"));
         Assert.That(result, Does.Contain("dto.City = source.City;"));
         // Public method populates entity lists for ALL types in graph
-        Assert.That(result, Does.Contain("result.PersonList = "));
-        Assert.That(result, Does.Contain("result.AddressList = "));
+        Assert.That(result, Does.Contain("result.PersonDtos = "));
+        Assert.That(result, Does.Contain("result.AddressDtos = "));
     }
 
     [Test]
@@ -327,11 +327,11 @@ public sealed class NormalizerEmitterTests
         // Each returns its own container type
         Assert.That(
             result,
-            Does.Contain("public static TestApp.NormalizedPersonResult Normalize(TestApp.Person source)")
+            Does.Contain("public static TestApp.PersonResultDto Normalize(TestApp.Person source)")
         );
         Assert.That(
             result,
-            Does.Contain("public static TestApp.NormalizedTreeNodeResult Normalize(TestApp.TreeNode source)")
+            Does.Contain("public static TestApp.TreeNodeResultDto Normalize(TestApp.TreeNode source)")
         );
     }
 
@@ -345,7 +345,7 @@ public sealed class NormalizerEmitterTests
 
         Assert.That(result, Does.Contain("Normalize(TestApp.Person source)"));
         // Should only have one Normalize method
-        var count = CountOccurrences(result, "public static TestApp.NormalizedPersonResult Normalize(");
+        var count = CountOccurrences(result, "public static TestApp.PersonResultDto Normalize(");
         Assert.That(count, Is.EqualTo(1));
     }
 
@@ -372,16 +372,16 @@ public sealed class NormalizerEmitterTests
         // Returns container type, not NormalizedResult<T>
         Assert.That(
             result,
-            Does.Contain("public static TestApp.NormalizedOrderResult Normalize(TestApp.Order source)")
+            Does.Contain("public static TestApp.OrderResultDto Normalize(TestApp.Order source)")
         );
         Assert.That(result, Does.Contain("var context = new DataNormalizer.Runtime.NormalizationContext(1);"));
         Assert.That(result, Does.Contain("NormalizeOrder(source, context);"));
         // Creates container and populates it
-        Assert.That(result, Does.Contain("var result = new TestApp.NormalizedOrderResult();"));
+        Assert.That(result, Does.Contain("var result = new TestApp.OrderResultDto();"));
         Assert.That(result, Does.Not.Contain("RootIndex"));
         // Entity list population
-        Assert.That(result, Does.Contain("context.GetCollection<TestApp.NormalizedOrder>(\"Order\")"));
-        Assert.That(result, Does.Contain("result.OrderList = "));
+        Assert.That(result, Does.Contain("context.GetCollection<TestApp.OrderDto>(\"Order\")"));
+        Assert.That(result, Does.Contain("result.OrderDtos = "));
         Assert.That(result, Does.Contain("return result;"));
         // Should NOT have old NormalizedResult pattern
         Assert.That(result, Does.Not.Contain("NormalizedResult<"));
@@ -414,9 +414,9 @@ public sealed class NormalizerEmitterTests
 
         Assert.That(result, Does.Contain("GetOrAddIndexAndStore(\"People\""));
         // Custom key is used in GetCollection lookup in public method
-        Assert.That(result, Does.Contain("GetCollection<TestApp.NormalizedPerson>(\"People\")"));
+        Assert.That(result, Does.Contain("GetCollection<TestApp.PersonDto>(\"People\")"));
         // But property name on container still uses TypeName, not custom key
-        Assert.That(result, Does.Contain("result.PersonList = "));
+        Assert.That(result, Does.Contain("result.PersonDtos = "));
     }
 
     [Test]
