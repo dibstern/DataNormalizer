@@ -10,6 +10,7 @@
     <PackageReference Include="Verify.NUnit" />
     <PackageReference Include="Verify.SourceGenerators" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Basic.Reference.Assemblies.Net90" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DataNormalizer.Generators\DataNormalizer.Generators.csproj" />

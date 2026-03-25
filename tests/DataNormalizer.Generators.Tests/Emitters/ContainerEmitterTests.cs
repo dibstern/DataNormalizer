@@ -49,6 +49,14 @@ public sealed class ContainerEmitterTests
                 "public TestApp.AddressDto[] AddressDtos { get; set; } = System.Array.Empty<TestApp.AddressDto>();"
             )
         );
+
+        // Container references DTO types — provide stubs
+        var stubs = new[]
+        {
+            "namespace TestApp { public class PersonDto { } }",
+            "namespace TestApp { public class AddressDto { } }",
+        };
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
     }
 
     [Test]
@@ -389,6 +397,9 @@ public sealed class ContainerEmitterTests
             result,
             Does.Contain("public TestApp.PersonDto Result { get; set; } = default!;")
         );
+
+        var stubs = new[] { "namespace TestApp { public class PersonDto { } }" };
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
     }
 
     [Test]
@@ -480,6 +491,9 @@ public sealed class ContainerEmitterTests
             Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"searchResult\")]")
         );
         Assert.That(result, Does.Contain("Result { get; set; } = default!;"));
+
+        var stubs = new[] { "namespace TestApp { public class PersonDto { } }" };
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
     }
 
     [Test]
@@ -533,6 +547,13 @@ public sealed class ContainerEmitterTests
             result,
             Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"routes\")]")
         );
+
+        var stubs = new[]
+        {
+            "namespace TestApp { public class PersonDto { } }",
+            "namespace TestApp { public class RouteDto { } }",
+        };
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
     }
 
     [Test]

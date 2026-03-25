@@ -46,6 +46,15 @@ public sealed class NormalizerEmitterTests
         Assert.That(result, Does.Contain("dto.Age = source.Age;"));
         // No nested normalize calls
         Assert.That(result, Does.Not.Contain("NormalizeAddress"));
+
+        // Verify compiles with stubs for user types and generated DTOs
+        var stubs = new[]
+        {
+            "namespace TestApp { public class Person { public string Name { get; set; } public int Age { get; set; } } }",
+            "namespace TestApp { public partial class PersonDto : System.IEquatable<PersonDto> { public string Name { get; set; } public int Age { get; set; } public bool Equals(PersonDto? other) => true; public override int GetHashCode() => 0; } }",
+            "namespace TestApp { public partial class PersonResultDto { public TestApp.PersonDto[] PersonDtos { get; set; } = System.Array.Empty<TestApp.PersonDto>(); public TestApp.PersonDto Result { get; set; } = default!; } }",
+        };
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
     }
 
     [Test]
@@ -85,6 +94,16 @@ public sealed class NormalizerEmitterTests
         // Public method populates entity lists for ALL types in graph
         Assert.That(result, Does.Contain("result.PersonDtos = "));
         Assert.That(result, Does.Contain("result.AddressDtos = "));
+
+        var stubs = new[]
+        {
+            "namespace TestApp { public class Person { public string Name { get; set; } public TestApp.Address HomeAddress { get; set; } } }",
+            "namespace TestApp { public class Address { public string Street { get; set; } public string City { get; set; } } }",
+            "namespace TestApp { public partial class PersonDto : System.IEquatable<PersonDto> { public string Name { get; set; } public int HomeAddressIndex { get; set; } public bool Equals(PersonDto? other) => true; public override int GetHashCode() => 0; } }",
+            "namespace TestApp { public partial class AddressDto : System.IEquatable<AddressDto> { public string Street { get; set; } public string City { get; set; } public bool Equals(AddressDto? other) => true; public override int GetHashCode() => 0; } }",
+            "namespace TestApp { public partial class PersonResultDto { public TestApp.PersonDto[] PersonDtos { get; set; } = System.Array.Empty<TestApp.PersonDto>(); public TestApp.AddressDto[] AddressDtos { get; set; } = System.Array.Empty<TestApp.AddressDto>(); public TestApp.PersonDto Result { get; set; } = default!; } }",
+        };
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
     }
 
     [Test]
@@ -762,6 +781,94 @@ public sealed class NormalizerEmitterTests
         // Both should create the __personCol variable
         Assert.That(resultWithList, Does.Contain("var __personCol = context.GetCollection<"));
         Assert.That(resultNoList, Does.Contain("var __personCol = context.GetCollection<"));
+    }
+
+    // ---- Cross-emitter compilation tests ----
+
+    [Test]
+    public void AllEmitters_PersonWithAddress_CompileTogether()
+    {
+        // Build models for a Person → Address graph
+        var personNode = CreateNode(
+            "TestApp.Person",
+            "Person",
+            isRootType: true,
+            needsList: true,
+            SimpleProp("Name", "string", isRef: true),
+            NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
+        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+        var naming = NamingModel.Default;
+
+        // Generate all emitter outputs
+        var personDto = DtoEmitter.Emit(personNode, copySourceAttributes: false, naming: naming);
+        var addressDto = DtoEmitter.Emit(addressNode, copySourceAttributes: false, naming: naming);
+        var container = ContainerEmitter.Emit(
+            personNode,
+            new[] { personNode, addressNode },
+            naming,
+            JsonContractModel.Default
+        );
+        var normalizer = NormalizerEmitter.Emit(model, new[] { personNode, addressNode });
+        var denormalizer = DenormalizerEmitter.Emit(model, new[] { personNode, addressNode });
+
+        // User type stubs
+        var stubs = new[]
+        {
+            "namespace TestApp { public class Person { public string Name { get; set; } public TestApp.Address HomeAddress { get; set; } } }",
+            "namespace TestApp { public class Address { public string Street { get; set; } } }",
+        };
+
+        EmitterCompilationHelper.AssertCompilesWithStubs(
+            new[] { personDto, addressDto, container, normalizer, denormalizer },
+            stubs
+        );
+    }
+
+    [Test]
+    public void AllEmitters_WithRootPropertyAndCollectionOverrides_CompileTogether()
+    {
+        // Build models with RootPropertyName and CollectionJsonNames overrides
+        var personNode = CreateNode(
+            "TestApp.Person",
+            "Person",
+            isRootType: true,
+            needsList: false,
+            SimpleProp("Name", "string", isRef: true),
+            NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
+        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+        var naming = NamingModel.Default;
+        var jsonContract = new JsonContractModel
+        {
+            RootPropertyName = "searchResult",
+            CollectionJsonNames = System.Collections.Immutable.ImmutableDictionary<string, string>
+                .Empty.Add("TestApp.Address", "addresses"),
+        };
+
+        var personDto = DtoEmitter.Emit(personNode, copySourceAttributes: false, naming: naming);
+        var addressDto = DtoEmitter.Emit(addressNode, copySourceAttributes: false, naming: naming);
+        var container = ContainerEmitter.Emit(
+            personNode,
+            new[] { personNode, addressNode },
+            naming,
+            jsonContract
+        );
+        var normalizer = NormalizerEmitter.Emit(model, new[] { personNode, addressNode });
+        var denormalizer = DenormalizerEmitter.Emit(model, new[] { personNode, addressNode });
+
+        var stubs = new[]
+        {
+            "namespace TestApp { public class Person { public string Name { get; set; } public TestApp.Address HomeAddress { get; set; } } }",
+            "namespace TestApp { public class Address { public string Street { get; set; } } }",
+        };
+
+        EmitterCompilationHelper.AssertCompilesWithStubs(
+            new[] { personDto, addressDto, container, normalizer, denormalizer },
+            stubs
+        );
     }
 
     // ---- Helpers ----

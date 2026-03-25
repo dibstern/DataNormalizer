@@ -30,6 +30,8 @@ public sealed class DtoEmitterTests
         Assert.That(result, Does.Contain("namespace TestApp;"));
         Assert.That(result, Does.Contain("public string Name { get; set; }"));
         Assert.That(result, Does.Contain("public int Age { get; set; }"));
+
+        EmitterCompilationHelper.AssertCompiles(result);
     }
 
     [Test]
@@ -46,6 +48,8 @@ public sealed class DtoEmitterTests
 
         Assert.That(result, Does.Contain("public int HomeAddressIndex { get; set; }"));
         Assert.That(result, Does.Not.Contain("public TestApp.Address"));
+
+        EmitterCompilationHelper.AssertCompiles(result);
     }
 
     [Test]
@@ -78,6 +82,8 @@ public sealed class DtoEmitterTests
         var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("public int[] PhoneNumbersIndices { get; set; }"));
+
+        EmitterCompilationHelper.AssertCompiles(result);
     }
 
     [Test]
@@ -116,6 +122,10 @@ public sealed class DtoEmitterTests
         Assert.That(result, Does.Contain("public int? WorkAddressIndex { get; set; }"));
         Assert.That(result, Does.Contain("public int[] PhoneNumbersIndices { get; set; }"));
         Assert.That(result, Does.Contain("public TestApp.Metadata Meta { get; set; }"));
+
+        // Inlined type needs a stub for compilation
+        var metadataStub = "namespace TestApp { public class Metadata { } }";
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, new[] { metadataStub });
     }
 
     [Test]
@@ -517,6 +527,8 @@ public sealed class DtoEmitterTests
         // GetHashCode should not reference NextIndex
         var hashSection = result.Substring(result.IndexOf("GetHashCode()"));
         Assert.That(hashSection, Does.Not.Contain("NextIndex"));
+
+        EmitterCompilationHelper.AssertCompiles(result);
     }
 
     // ---- New NamingModel-specific tests ----
@@ -631,6 +643,8 @@ public sealed class DtoEmitterTests
 
         Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"line\")]"));
         Assert.That(result, Does.Not.Contain("JsonPropertyName(\"lineIndex\")"));
+
+        EmitterCompilationHelper.AssertCompiles(result);
     }
 
     [Test]
@@ -882,6 +896,20 @@ public sealed class DtoEmitterTests
         // C# property name should still be LineIndex, not customLine
         Assert.That(result, Does.Contain("public int LineIndex { get; set; }"));
         Assert.That(result, Does.Contain("JsonPropertyName(\"customLine\")"));
+    }
+
+    [Test]
+    public void CompilationHelper_MalformedCode_FailsCompilation()
+    {
+        var malformed = """
+            namespace TestApp;
+            public class Broken
+            {
+                public UndefinedType Foo { get; set; }
+            }
+            """;
+
+        EmitterCompilationHelper.AssertDoesNotCompile(malformed);
     }
 
     private static int CountOccurrences(string text, string pattern)

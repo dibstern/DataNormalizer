@@ -18,6 +18,14 @@ public sealed class DenormalizerEmitterTests
 
         Assert.That(result, Does.Contain("public static TestApp.Person Denormalize("));
         Assert.That(result, Does.Contain("TestApp.PersonResultDto normalized"));
+
+        var stubs = new[]
+        {
+            "namespace TestApp { public class Person { public string Name { get; set; } public int Age { get; set; } } }",
+            "namespace TestApp { public class PersonDto { public string Name { get; set; } public int Age { get; set; } } }",
+            "namespace TestApp { public partial class PersonResultDto { public TestApp.PersonDto[] PersonDtos { get; set; } = System.Array.Empty<TestApp.PersonDto>(); public TestApp.PersonDto Result { get; set; } = default!; } }",
+        };
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
     }
 
     [Test]
@@ -39,6 +47,16 @@ public sealed class DenormalizerEmitterTests
 
         // Pass 2 resolves HomeAddress index
         Assert.That(result, Does.Contain("persons[i].HomeAddress = addresses[personDtos[i].HomeAddressIndex]"));
+
+        var stubs = new[]
+        {
+            "namespace TestApp { public class Person { public string Name { get; set; } public TestApp.Address HomeAddress { get; set; } } }",
+            "namespace TestApp { public class Address { public string Street { get; set; } public string City { get; set; } } }",
+            "namespace TestApp { public class PersonDto { public string Name { get; set; } public int HomeAddressIndex { get; set; } } }",
+            "namespace TestApp { public class AddressDto { public string Street { get; set; } public string City { get; set; } } }",
+            "namespace TestApp { public partial class PersonResultDto { public TestApp.PersonDto[] PersonDtos { get; set; } = System.Array.Empty<TestApp.PersonDto>(); public TestApp.AddressDto[] AddressDtos { get; set; } = System.Array.Empty<TestApp.AddressDto>(); public TestApp.PersonDto Result { get; set; } = default!; } }",
+        };
+        EmitterCompilationHelper.AssertCompilesWithStubs(new[] { result }, stubs);
     }
 
     [Test]
