@@ -56,7 +56,8 @@ The script:
    - For each route: replace `segments` (int[]) with full expanded segments, replace `transitGuides`, `places`
    - For result: replace `routes`, `transitGuides`, `originPlace`, `destinationPlace`
    - For each carrier: replace `transitImages` (int[]) with full objects
-   - For each place: replace `nearbyCity` (int) with full place object (watch for circular refs -- just inline once, no recursion)
+   - For each place: replace `nearbyCity` (int) with full place object (one level only -- do not recurse into the expanded place's own `nearbyCity`)
+   - For each route: replace `hotelInfo.centerPlace` (int) with full `places[i]` object
 5. Serializes the unnormalized tree as minified JSON
 6. Measures raw + gzipped sizes
 7. Also measures pretty-printed sizes for both
@@ -118,6 +119,20 @@ JsonArray? LookupArray(JsonArray table, JsonNode? indices)
     return arr;
 }
 
+// Expand places: replace nearbyCity index (one level only, no recursion)
+var expandedPlaces = new JsonArray();
+foreach (var p in places)
+{
+    var ep = p!.DeepClone().AsObject();
+    if (ep.ContainsKey("nearbyCity"))
+    {
+        var nearbyCityNode = Lookup(places, ep["nearbyCity"]);
+        if (nearbyCityNode != null)
+            ep["nearbyCity"] = nearbyCityNode;
+    }
+    expandedPlaces.Add(ep);
+}
+
 // Expand carriers: replace transitImages indices
 var expandedCarriers = new JsonArray();
 foreach (var c in carriers)
@@ -134,12 +149,12 @@ foreach (var l in lines)
 {
     var el = l!.DeepClone().AsObject();
     if (el.ContainsKey("places"))
-        el["places"] = LookupArray(places, el["places"]);
-    if (el.ContainsKey("path") && el["path"] is JsonValue pathVal)
+        el["places"] = LookupArray(expandedPlaces, el["places"]);
+    if (el.ContainsKey("path"))
     {
-        var pathIdx = pathVal.GetValue<int>();
-        if (pathIdx >= 0 && pathIdx < paths.Count)
-            el["path"] = JsonValue.Create(paths[pathIdx]!.GetValue<string>());
+        var pathNode = Lookup(paths, el["path"]);
+        if (pathNode != null)
+            el["path"] = pathNode;
     }
     expandedLines.Add(el);
 }
@@ -150,11 +165,20 @@ foreach (var h in hops)
 {
     var eh = h!.DeepClone().AsObject();
     if (eh.ContainsKey("line"))
-        eh["line"] = expandedLines[eh["line"]!.GetValue<int>()]!.DeepClone();
+    {
+        var lineNode = Lookup(expandedLines, eh["line"]);
+        if (lineNode != null) eh["line"] = lineNode;
+    }
     if (eh.ContainsKey("marketingCarrier"))
-        eh["marketingCarrier"] = expandedCarriers[eh["marketingCarrier"]!.GetValue<int>()]!.DeepClone();
+    {
+        var carrierNode = Lookup(expandedCarriers, eh["marketingCarrier"]);
+        if (carrierNode != null) eh["marketingCarrier"] = carrierNode;
+    }
     if (eh.ContainsKey("vehicle"))
-        eh["vehicle"] = vehicles[eh["vehicle"]!.GetValue<int>()]!.DeepClone();
+    {
+        var vehicleNode = Lookup(vehicles, eh["vehicle"]);
+        if (vehicleNode != null) eh["vehicle"] = vehicleNode;
+    }
     if (eh.ContainsKey("transitImages"))
         eh["transitImages"] = LookupArray(transitImages, eh["transitImages"]);
     // Expand codeshares carrier references too
@@ -165,7 +189,10 @@ foreach (var h in hops)
         {
             var ecs = cs!.DeepClone().AsObject();
             if (ecs.ContainsKey("carrier"))
-                ecs["carrier"] = expandedCarriers[ecs["carrier"]!.GetValue<int>()]!.DeepClone();
+            {
+                var csCarrier = Lookup(expandedCarriers, ecs["carrier"]);
+                if (csCarrier != null) ecs["carrier"] = csCarrier;
+            }
             expandedCodeshares.Add(ecs);
         }
         eh["codeshares"] = expandedCodeshares;
@@ -195,7 +222,7 @@ foreach (var s in segments)
     expandedSegments.Add(es);
 }
 
-// Expand routes: replace segments, transitGuides, places
+// Expand routes: replace segments, transitGuides, places, hotelInfo.centerPlace
 var expandedRoutes = new JsonArray();
 foreach (var r in routes)
 {
@@ -205,25 +232,33 @@ foreach (var r in routes)
     if (er.ContainsKey("transitGuides"))
         er["transitGuides"] = LookupArray(transitGuides, er["transitGuides"]);
     if (er.ContainsKey("places"))
-        er["places"] = LookupArray(places, er["places"]);
+        er["places"] = LookupArray(expandedPlaces, er["places"]);
+    // Expand hotelInfo.centerPlace
+    if (er.ContainsKey("hotelInfo") && er["hotelInfo"] is JsonObject hotelInfo
+        && hotelInfo.ContainsKey("centerPlace"))
+    {
+        var centerNode = Lookup(expandedPlaces, hotelInfo["centerPlace"]);
+        if (centerNode != null) hotelInfo["centerPlace"] = centerNode;
+    }
     expandedRoutes.Add(er);
 }
 
 // Expand result: replace routes, transitGuides, originPlace, destinationPlace
 var result = doc["result"]!.DeepClone().AsObject();
 if (result.ContainsKey("routes"))
-{
-    var routeArr = new JsonArray();
-    foreach (var idx in result["routes"]!.AsArray())
-        routeArr.Add(expandedRoutes[idx!.GetValue<int>()]!.DeepClone());
-    result["routes"] = routeArr;
-}
+    result["routes"] = LookupArray(expandedRoutes, result["routes"]);
 if (result.ContainsKey("transitGuides"))
     result["transitGuides"] = LookupArray(transitGuides, result["transitGuides"]);
 if (result.ContainsKey("originPlace"))
-    result["originPlace"] = places[result["originPlace"]!.GetValue<int>()]!.DeepClone();
+{
+    var originNode = Lookup(expandedPlaces, result["originPlace"]);
+    if (originNode != null) result["originPlace"] = originNode;
+}
 if (result.ContainsKey("destinationPlace"))
-    result["destinationPlace"] = places[result["destinationPlace"]!.GetValue<int>()]!.DeepClone();
+{
+    var destNode = Lookup(expandedPlaces, result["destinationPlace"]);
+    if (destNode != null) result["destinationPlace"] = destNode;
+}
 
 // Build unnormalized document: keep request, analytics, adsConfig, timeZones, debug
 // But inline the result instead of having separate lookup tables
@@ -597,10 +632,16 @@ docs: add Naming & JSON Contracts article
 
 Changes:
 - In "Working with the result" section, replace `result.TeamList[0]` with `result.Result`
+- **Remove ALL `TeamList` references** -- Team is the root and not referenced by other types, so `NeedsList = false` and no `TeamList` property exists on the container
 - Update the container access example to show `Result` as the entry point
-- Remove "always at index 0" language
-- Update generated type descriptions to mention the `Dto` suffix as default
+- Remove "always at index 0" language throughout
+- Update generated type descriptions to use `Dto` suffix:
+  - Line 85: `Normalized{TypeName}` → `{TypeName}Dto`
+  - Line 93: `Normalized{RootType}Result` → `{RootType}ResultDto`
+  - Line 98: `result.TeamList[0]` → `result.Result`
+  - Lines 100-103: `result.TeamList` → removed (no root list), `NormalizedTeam[]` → `TeamDto`, `NormalizedPerson[]` → `PersonDto[]`, `NormalizedAddress[]` → `AddressDto[]`, property names `PersonList` → `PersonDtos`, `AddressList` → `AddressDtos`
 - Add "Next steps" link to the new Naming & JSON Contracts article
+- Update "DN0001–DN0004" reference (line 112) to "DN0001–DN1002"
 - Keep Team/Person/Address as the tutorial example (it's simpler for getting started)
 
 The "Working with the result" section becomes:
@@ -618,19 +659,28 @@ result.AddressDtos                       // AddressDto[] (typed array)
 // The container serializes directly with System.Text.Json.
 ```
 
-Update the "What the source generator produces" section:
-- Mention that types get a `Dto` suffix by default (configurable via `UseNaming()`)
-- `{TypeName}Dto` instead of `Normalized{TypeName}`
-- Container type: `{RootType}ResultDto`
+**Step 2: Expand "What the source generator produces" into "How It Works"**
 
-**Step 2: Verify all code examples are consistent**
+Rename the section to "How It Works" and expand it to include:
 
-Read through the file to check that Team/Person/Address types, config, and result access are consistent with the new container shape.
+1. **Per-type DTOs** (`{TypeName}Dto`) -- partial classes implementing `IEquatable<T>` for value-based deduplication. Nested object references become `int` index properties (`{Name}Index`), collections become `int[]` (`{Name}Indices`). Types marked as inline keep their original structure.
 
-**Step 3: Commit**
+2. **A container result** (`{RootType}ResultDto`) -- holds a `Result` property for the root entity and typed array properties for every other entity type in the graph. If the root type is also referenced by other types, a root list array is included too.
+
+3. **`Normalize(T)` / `Denormalize({RootType}ResultDto)`** -- static methods on the configuration class. `Normalize` flattens the graph using value-equality-based deduplication. `Denormalize` reconstructs the original object graph with shared references preserved.
+
+4. **Naming and JSON serialization** -- By default, DTOs get a `Dto` suffix and `[JsonPropertyName]` attributes for camelCase JSON. Both are configurable via `UseNaming()`. The JSON wire format can be further customized with `UseJsonContract()` and `Reference().JsonName()`.
+
+All generated types are `partial`, so you can extend them with additional members.
+
+**Step 3: Verify all code examples are consistent**
+
+Read through the file to check that Team/Person/Address types, config, and result access are consistent with the new container shape. Verify no references to `Normalized{TypeName}`, `{X}List`, or `list[0]` remain.
+
+**Step 4: Commit**
 
 ```
-docs: update Getting Started for Result property and Dto naming
+docs: update Getting Started with How It Works section, Result property, and Dto naming
 ```
 
 ---
@@ -642,9 +692,13 @@ docs: update Getting Started for Result property and Dto naming
 
 **Step 1: Update existing sections**
 
-- Update "Container Result API" section: `result.TeamList[0]` → `result.Result`
-- Update type names to use `Dto` suffix
+Enumerate ALL stale references and update them:
+- Line 50: `Normalized{TypeName}` → `{TypeName}Dto`
+- Lines 87-88: `NormalizedTeamResult` → `TeamResultDto`, `NormalizedOrderResult` → `OrderResultDto`
+- Line 96: `Normalized{RootType}Result` → `{RootType}ResultDto`
+- Lines 100-105: `result.TeamList[0]` → `result.Result`, remove `result.TeamList` (root has no list when not referenced by other types), `NormalizedTeam[]` → `TeamDto`, `NormalizedPerson[]` → `PersonDto[]`, `NormalizedAddress[]` → `AddressDto[]`, `PersonList` → `PersonDtos`, `AddressList` → `AddressDtos`
 - Remove "always at index 0" language
+- Add explanation of root property behavior: root always gets `Result` property, only gets a list array if other types reference it
 
 **Step 2: Add Naming Policy section**
 
@@ -775,12 +829,13 @@ docs: add DN1001 and DN1002 to Diagnostics Reference
 
 ---
 
-### Task 8: Update `docs/index.md` (landing page)
+### Task 8: Update `docs/index.md` and `docs/api/index.md`
 
 **Files:**
 - Modify: `docs/index.md`
+- Modify: `docs/api/index.md`
 
-**Step 1: Update the landing page**
+**Step 1: Update the landing page (`docs/index.md`)**
 
 - Update tagline to match README
 - Replace Team/Person/Address example with a compact transport example
@@ -795,10 +850,15 @@ After: flat container with `result`, typed `Dto` arrays, integer refs
 
 Add link for "Why Gzip Isn't Enough" in the Get Started section.
 
-**Step 2: Commit**
+**Step 2: Update API index (`docs/api/index.md`)**
+
+- Line 9: Update `Normalized{RootType}Result` to `{RootType}ResultDto`
+- Update any other stale generated type name references
+
+**Step 3: Commit**
 
 ```
-docs: update landing page with transport example and new article links
+docs: update landing page and API index with transport example and new naming
 ```
 
 ---
