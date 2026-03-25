@@ -9,6 +9,10 @@ namespace DataNormalizer.Generators.Tests.Emitters;
 [TestFixture]
 public sealed class ContainerEmitterTests
 {
+    private static readonly NamingModel DefaultNaming = NamingModel.Default;
+
+    private static readonly NamingModel NoJsonNaming = new NamingModel { EmitJsonPropertyNames = false };
+
     [Test]
     public void Emit_SimpleGraph_GeneratesContainerWithEntityLists()
     {
@@ -21,36 +25,36 @@ public sealed class ContainerEmitterTests
         var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, addressNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, DefaultNaming);
 
-        Assert.That(result, Does.Contain("public partial class NormalizedPersonResult"));
+        Assert.That(result, Does.Contain("public partial class PersonResultDto"));
         Assert.That(result, Does.Not.Contain("RootIndex"));
         Assert.That(
             result,
             Does.Contain(
-                "public TestApp.NormalizedPerson[] PersonList { get; set; } = System.Array.Empty<TestApp.NormalizedPerson>();"
+                "public TestApp.PersonDto[] PersonDtos { get; set; } = System.Array.Empty<TestApp.PersonDto>();"
             )
         );
         Assert.That(
             result,
             Does.Contain(
-                "public TestApp.NormalizedAddress[] AddressList { get; set; } = System.Array.Empty<TestApp.NormalizedAddress>();"
+                "public TestApp.AddressDto[] AddressDtos { get; set; } = System.Array.Empty<TestApp.AddressDto>();"
             )
         );
     }
 
     [Test]
-    public void Emit_CamelCaseJsonNaming_EmitsJsonPropertyNameAttributes()
+    public void Emit_DefaultNaming_EmitsJsonPropertyNameAttributes()
     {
         var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, addressNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: "CamelCase");
+        var result = ContainerEmitter.Emit(personNode, allNodes, DefaultNaming);
 
         Assert.That(result, Does.Not.Contain("rootIndex"));
-        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"personList\")]"));
-        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"addressList\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"personDtos\")]"));
+        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"addressDtos\")]"));
     }
 
     [Test]
@@ -59,7 +63,7 @@ public sealed class ContainerEmitterTests
         var personNode = CreateNode("TestApp.Models.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         Assert.That(result, Does.Contain("namespace TestApp.Models;"));
     }
@@ -70,7 +74,7 @@ public sealed class ContainerEmitterTests
         var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         Assert.That(result, Does.Not.Contain("IEquatable"));
         Assert.That(result, Does.Not.Contain("Equals"));
@@ -83,9 +87,9 @@ public sealed class ContainerEmitterTests
         var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
-        Assert.That(result, Does.Contain("public TestApp.NormalizedPerson[] PersonList { get; set; }"));
+        Assert.That(result, Does.Contain("public TestApp.PersonDto[] PersonDtos { get; set; }"));
     }
 
     [Test]
@@ -94,7 +98,7 @@ public sealed class ContainerEmitterTests
         var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         Assert.That(result, Does.Contain("[System.CodeDom.Compiler.GeneratedCode(\"DataNormalizer\", \"1.0.0\")]"));
     }
@@ -105,7 +109,7 @@ public sealed class ContainerEmitterTests
         var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         Assert.That(result, Does.Contain("#nullable enable"));
     }
@@ -116,7 +120,7 @@ public sealed class ContainerEmitterTests
         var personNode = CreateNode("Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         Assert.That(result, Does.Not.Contain("namespace"));
     }
@@ -128,23 +132,23 @@ public sealed class ContainerEmitterTests
         var emptyNode = CreateNode("TestApp.Marker", "Marker");
         var allNodes = new List<TypeGraphNode> { personNode, emptyNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         Assert.That(
             result,
             Does.Contain(
-                "public TestApp.NormalizedMarker[] MarkerList { get; set; } = System.Array.Empty<TestApp.NormalizedMarker>();"
+                "public TestApp.MarkerDto[] MarkerDtos { get; set; } = System.Array.Empty<TestApp.MarkerDto>();"
             )
         );
     }
 
     [Test]
-    public void Emit_NullJsonNamingPolicy_NoJsonPropertyNameAttributes()
+    public void Emit_EmitJsonPropertyNamesFalse_NoJsonPropertyNameAttributes()
     {
         var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         Assert.That(result, Does.Not.Contain("JsonPropertyName"));
     }
@@ -157,30 +161,36 @@ public sealed class ContainerEmitterTests
         var contosoAddress = CreateNode("Contoso.Address", "Address", SimpleProp("City", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, acmeAddress, contosoAddress };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         // The two Address types must be disambiguated with namespace prefix
-        Assert.That(result, Does.Contain("AcmeAddressList"));
-        Assert.That(result, Does.Contain("ContosoAddressList"));
-        // The simple "AddressList" should NOT appear (both are disambiguated)
-        Assert.That(result, Does.Not.Contain("public Acme.NormalizedAddress[] AddressList"));
-        Assert.That(result, Does.Not.Contain("public Contoso.NormalizedAddress[] AddressList"));
+        Assert.That(result, Does.Contain("AcmeAddressDtos"));
+        Assert.That(result, Does.Contain("ContosoAddressDtos"));
+        // The simple "AddressDtos" should NOT appear (both are disambiguated)
+        Assert.That(result, Does.Not.Contain("public Acme.AddressDto[] AddressDtos"));
+        Assert.That(result, Does.Not.Contain("public Contoso.AddressDto[] AddressDtos"));
         // Person has no collision, so stays simple
-        Assert.That(result, Does.Contain("PersonList"));
+        Assert.That(result, Does.Contain("PersonDtos"));
     }
 
     [Test]
-    public void Emit_DuplicateTypeNames_CamelCase_DisambiguatesJsonPropertyNames()
+    public void Emit_DuplicateTypeNames_WithJsonNames_DisambiguatesJsonPropertyNames()
     {
         var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
         var acmeAddress = CreateNode("Acme.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var contosoAddress = CreateNode("Contoso.Address", "Address", SimpleProp("City", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, acmeAddress, contosoAddress };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: "CamelCase");
+        var result = ContainerEmitter.Emit(personNode, allNodes, DefaultNaming);
 
-        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"acmeAddressList\")]"));
-        Assert.That(result, Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"contosoAddressList\")]"));
+        Assert.That(
+            result,
+            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"acmeAddressDtos\")]")
+        );
+        Assert.That(
+            result,
+            Does.Contain("[System.Text.Json.Serialization.JsonPropertyName(\"contosoAddressDtos\")]")
+        );
     }
 
     [Test]
@@ -190,14 +200,14 @@ public sealed class ContainerEmitterTests
         var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
         var allNodes = new List<TypeGraphNode> { personNode, addressNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         // No collision, so simple names used
-        Assert.That(result, Does.Contain("PersonList"));
-        Assert.That(result, Does.Contain("AddressList"));
+        Assert.That(result, Does.Contain("PersonDtos"));
+        Assert.That(result, Does.Contain("AddressDtos"));
         // No namespace-prefixed names
-        Assert.That(result, Does.Not.Contain("TestAppPersonList"));
-        Assert.That(result, Does.Not.Contain("TestAppAddressList"));
+        Assert.That(result, Does.Not.Contain("TestAppPersonDtos"));
+        Assert.That(result, Does.Not.Contain("TestAppAddressDtos"));
     }
 
     [Test]
@@ -211,10 +221,58 @@ public sealed class ContainerEmitterTests
         );
         var allNodes = new List<TypeGraphNode> { personNode };
 
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+        var result = ContainerEmitter.Emit(personNode, allNodes, NoJsonNaming);
 
         Assert.That(result, Does.Not.Contain("public string Name"));
         Assert.That(result, Does.Not.Contain("public int Age"));
+    }
+
+    [Test]
+    public void Emit_CustomDtoPrefix_UsesInContainerAndDtoNames()
+    {
+        var naming = new NamingModel
+        {
+            DtoPrefix = "Norm",
+            DtoSuffix = "",
+            EmitJsonPropertyNames = false,
+        };
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var allNodes = new List<TypeGraphNode> { personNode };
+
+        var result = ContainerEmitter.Emit(personNode, allNodes, naming);
+
+        Assert.That(result, Does.Contain("public TestApp.NormPerson[] PersonList { get; set; }"));
+    }
+
+    [Test]
+    public void Emit_EmptyDtoSuffix_UsesListSuffix()
+    {
+        var naming = new NamingModel
+        {
+            DtoPrefix = "",
+            DtoSuffix = "",
+            EmitJsonPropertyNames = false,
+        };
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var allNodes = new List<TypeGraphNode> { personNode };
+
+        var result = ContainerEmitter.Emit(personNode, allNodes, naming);
+
+        // When DtoSuffix is empty, GetListPropertyName falls back to "{TypeName}List"
+        Assert.That(result, Does.Contain("PersonList"));
+    }
+
+    [Test]
+    public void Emit_LegacyOverload_ProducesOldStyleNames()
+    {
+        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
+        var allNodes = new List<TypeGraphNode> { personNode };
+
+        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
+
+        Assert.That(result, Does.Contain("NormalizedPersonResult"));
+        Assert.That(result, Does.Contain("NormalizedPerson[]"));
+        Assert.That(result, Does.Contain("PersonList"));
     }
 
     // ---- Helpers ----
