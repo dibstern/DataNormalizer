@@ -653,6 +653,117 @@ public sealed class NormalizerEmitterTests
         Assert.That(result, Does.Not.Contain("TrackSource"));
     }
 
+    // ---- Root property behavior tests ----
+
+    [Test]
+    public void Emit_RootNeedsListFalse_SetsResultButNotListProperty()
+    {
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+        var rootNode = CreateNode(
+            "TestApp.Person",
+            "Person",
+            isRootType: true,
+            needsList: false,
+            SimpleProp("Name", "string", isRef: true)
+        );
+
+        var result = NormalizerEmitter.Emit(model, new[] { rootNode });
+
+        // Root should always set result.Result
+        Assert.That(result, Does.Contain("result.Result = __personCol[0];"));
+        // Root with NeedsList=false should NOT set the list property
+        Assert.That(result, Does.Not.Contain("result.PersonDtos"));
+    }
+
+    [Test]
+    public void Emit_RootNeedsListTrue_SetsBothResultAndListProperty()
+    {
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+        var rootNode = CreateNode(
+            "TestApp.Person",
+            "Person",
+            isRootType: true,
+            needsList: true,
+            SimpleProp("Name", "string", isRef: true)
+        );
+
+        var result = NormalizerEmitter.Emit(model, new[] { rootNode });
+
+        // Root should always set result.Result
+        Assert.That(result, Does.Contain("result.Result = __personCol[0];"));
+        // Root with NeedsList=true should ALSO set the list property
+        Assert.That(result, Does.Contain("result.PersonDtos = "));
+    }
+
+    [Test]
+    public void Emit_NonRootType_SetsListPropertyOnly()
+    {
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+        var rootNode = CreateNode(
+            "TestApp.Person",
+            "Person",
+            isRootType: true,
+            needsList: false,
+            SimpleProp("Name", "string", isRef: true),
+            NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
+        );
+        var addressNode = CreateNode("TestApp.Address", "Address", SimpleProp("Street", "string", isRef: true));
+
+        var result = NormalizerEmitter.Emit(model, new[] { rootNode, addressNode });
+
+        // Non-root type should have its list property set
+        Assert.That(result, Does.Contain("result.AddressDtos = "));
+    }
+
+    [Test]
+    public void Emit_CircularSelfReferencingRootNeedsListTrue_SetsBothResultAndList()
+    {
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.TreeNode");
+        var rootNode = CreateNode(
+            "TestApp.TreeNode",
+            "TreeNode",
+            hasCircularReference: true,
+            isRootType: true,
+            needsList: true,
+            SimpleProp("Label", "string", isRef: true),
+            NormalizedProp("Parent", "TestApp.TreeNode", nullable: true, isCircular: true)
+        );
+
+        var result = NormalizerEmitter.Emit(model, new[] { rootNode });
+
+        // Root should set result.Result
+        Assert.That(result, Does.Contain("result.Result = __treeNodeCol[0];"));
+        // Root with NeedsList=true should ALSO set list property
+        Assert.That(result, Does.Contain("result.TreeNodeDtos = "));
+    }
+
+    [Test]
+    public void Emit_RootType_AlwaysCreatesCollectionVariable()
+    {
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+        var rootNodeNeedsList = CreateNode(
+            "TestApp.Person",
+            "Person",
+            isRootType: true,
+            needsList: true,
+            SimpleProp("Name", "string", isRef: true)
+        );
+        var rootNodeNoList = CreateNode(
+            "TestApp.Person",
+            "Person",
+            isRootType: true,
+            needsList: false,
+            SimpleProp("Name", "string", isRef: true)
+        );
+
+        var resultWithList = NormalizerEmitter.Emit(model, new[] { rootNodeNeedsList });
+        var resultNoList = NormalizerEmitter.Emit(model, new[] { rootNodeNoList });
+
+        // Both should create the __personCol variable
+        Assert.That(resultWithList, Does.Contain("var __personCol = context.GetCollection<"));
+        Assert.That(resultNoList, Does.Contain("var __personCol = context.GetCollection<"));
+    }
+
     // ---- Helpers ----
 
     private static NormalizationModel CreateModel(
@@ -695,6 +806,44 @@ public sealed class NormalizerEmitterTests
             TypeName = name,
             Properties = props.ToImmutableArray(),
             HasCircularReference = hasCircularReference,
+        };
+    }
+
+    private static TypeGraphNode CreateNode(
+        string fullName,
+        string name,
+        bool isRootType,
+        bool needsList,
+        params AnalyzedProperty[] props
+    )
+    {
+        return new TypeGraphNode
+        {
+            TypeFullName = fullName,
+            TypeName = name,
+            Properties = props.ToImmutableArray(),
+            IsRootType = isRootType,
+            NeedsList = needsList,
+        };
+    }
+
+    private static TypeGraphNode CreateNode(
+        string fullName,
+        string name,
+        bool hasCircularReference,
+        bool isRootType,
+        bool needsList,
+        params AnalyzedProperty[] props
+    )
+    {
+        return new TypeGraphNode
+        {
+            TypeFullName = fullName,
+            TypeName = name,
+            Properties = props.ToImmutableArray(),
+            HasCircularReference = hasCircularReference,
+            IsRootType = isRootType,
+            NeedsList = needsList,
         };
     }
 
