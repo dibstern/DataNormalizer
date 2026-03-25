@@ -201,6 +201,7 @@ public sealed class NormalizeGenerator : IIncrementalGenerator
             {
                 "DN0001" => DiagnosticDescriptors.CircularReference,
                 "DN0003" => DiagnosticDescriptors.NoPublicProperties,
+                "DN1002" => DiagnosticDescriptors.DuplicateCollectionType,
                 _ => DiagnosticDescriptors.ConfigClassMustBePartial,
             };
             spc.ReportDiagnostic(Diagnostic.Create(descriptor, Location.None, diag.TypeName));

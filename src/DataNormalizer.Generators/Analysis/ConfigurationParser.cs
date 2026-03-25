@@ -57,6 +57,12 @@ internal static class ConfigurationParser
                 EmitJsonPropertyNames =
                     context.GraphEmitJsonPropertyNames ?? context.GlobalEmitJsonPropertyNames,
             },
+            JsonContract = new JsonContractModel
+            {
+                RootPropertyName = context.RootPropertyName,
+                CollectionJsonNames = context.CollectionJsonNames.ToImmutableDictionary(),
+            },
+            Diagnostics = context.Diagnostics.ToImmutableArray(),
         };
     }
 
@@ -160,6 +166,10 @@ internal static class ConfigurationParser
                 ProcessUseNamingLambda(invocation, context, isGraph: true);
                 return ReceiverKind.GraphBuilder;
 
+            case "UseJsonContract" when receiverKind == ReceiverKind.GraphBuilder:
+                ProcessJsonContractLambda(invocation, context);
+                return ReceiverKind.GraphBuilder;
+
             case "UseJsonNaming" when receiverKind == ReceiverKind.GraphBuilder:
                 context.GlobalEmitJsonPropertyNames = true;
                 return ReceiverKind.GraphBuilder;
@@ -183,6 +193,24 @@ internal static class ConfigurationParser
             case "InlineProperty" when receiverKind == ReceiverKind.TypeBuilder:
                 ProcessPropertyAction(invocation, receiverName, "Inline", context);
                 return ReceiverKind.TypeBuilder;
+
+            case "Collection" when receiverKind == ReceiverKind.JsonContractBuilder:
+            {
+                var typeFqn = GetTypeArgumentSymbol(memberAccess, context.SemanticModel);
+                var jsonName = ExtractStringArgument(invocation);
+                if (typeFqn != null && jsonName != null)
+                {
+                    var normalizedFqn = NormalizeFqn(
+                        typeFqn.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    );
+                    if (!context.SeenCollectionTypes.Add(normalizedFqn))
+                    {
+                        context.Diagnostics.Add(new GeneratorDiagnosticInfo("DN1002", normalizedFqn));
+                    }
+                    context.CollectionJsonNames[normalizedFqn] = jsonName;
+                }
+                return ReceiverKind.JsonContractBuilder;
+            }
 
             case "WithName" when receiverKind == ReceiverKind.TypeBuilder:
                 ProcessWithName(invocation, receiverName, context);
@@ -409,6 +437,25 @@ internal static class ConfigurationParser
         }
     }
 
+    private static void ProcessJsonContractLambda(InvocationExpressionSyntax invocation, ParseContext context)
+    {
+        if (invocation.ArgumentList.Arguments.Count == 0)
+            return;
+
+        var lambdaArg = invocation.ArgumentList.Arguments[0].Expression;
+        var lambdaParamName = GetLambdaParameterName(lambdaArg);
+        if (lambdaParamName is null)
+            return;
+
+        context.ReceiverMap[lambdaParamName] = ReceiverKind.JsonContractBuilder;
+
+        var body = GetLambdaBody(lambdaArg);
+        if (body is BlockSyntax block)
+        {
+            ProcessStatements(block.Statements, context);
+        }
+    }
+
     private static void ProcessAssignment(AssignmentExpressionSyntax assignment, ParseContext context)
     {
         // Extract receiver and property name from left-hand side: n.DtoSuffix
@@ -422,29 +469,43 @@ internal static class ConfigurationParser
         if (!context.ReceiverMap.TryGetValue(receiverName, out var receiverKind))
             return;
 
-        if (receiverKind != ReceiverKind.NamingBuilder)
-            return;
-
         var propertyName = memberAccess.Name.Identifier.Text;
 
-        switch (propertyName)
+        switch (receiverKind)
         {
-            case "DtoPrefix":
-            case "DtoSuffix":
-            case "ContainerSuffix":
-                if (assignment.Right is not LiteralExpressionSyntax stringLiteral)
-                    return;
-                var stringValue = stringLiteral.Token.ValueText;
-                SetNamingStringProperty(propertyName, stringValue, context);
+            case ReceiverKind.NamingBuilder:
+                switch (propertyName)
+                {
+                    case "DtoPrefix":
+                    case "DtoSuffix":
+                    case "ContainerSuffix":
+                        if (assignment.Right is not LiteralExpressionSyntax stringLiteral)
+                            return;
+                        var stringValue = stringLiteral.Token.ValueText;
+                        SetNamingStringProperty(propertyName, stringValue, context);
+                        break;
+
+                    case "EmitJsonPropertyNames":
+                        if (assignment.Right.IsKind(SyntaxKind.TrueLiteralExpression))
+                            SetNamingBoolProperty(propertyName, true, context);
+                        else if (assignment.Right.IsKind(SyntaxKind.FalseLiteralExpression))
+                            SetNamingBoolProperty(propertyName, false, context);
+                        // Non-literal RHS: silently ignored
+                        break;
+                }
                 break;
 
-            case "EmitJsonPropertyNames":
-                if (assignment.Right.IsKind(SyntaxKind.TrueLiteralExpression))
-                    SetNamingBoolProperty(propertyName, true, context);
-                else if (assignment.Right.IsKind(SyntaxKind.FalseLiteralExpression))
-                    SetNamingBoolProperty(propertyName, false, context);
-                // Non-literal RHS: silently ignored
+            case ReceiverKind.JsonContractBuilder:
+                if (
+                    propertyName == "RootPropertyName"
+                    && assignment.Right is LiteralExpressionSyntax rootLit
+                    && rootLit.IsKind(SyntaxKind.StringLiteralExpression)
+                )
+                    context.RootPropertyName = rootLit.Token.ValueText;
                 break;
+
+            default:
+                return;
         }
     }
 
@@ -586,12 +647,25 @@ internal static class ConfigurationParser
         }
     }
 
+    private static string? ExtractStringArgument(InvocationExpressionSyntax invocation)
+    {
+        var args = invocation.ArgumentList.Arguments;
+        if (
+            args.Count > 0
+            && args[0].Expression is LiteralExpressionSyntax literal
+            && literal.IsKind(SyntaxKind.StringLiteralExpression)
+        )
+            return literal.Token.ValueText;
+        return null;
+    }
+
     private enum ReceiverKind
     {
         NormalizeBuilder,
         GraphBuilder,
         TypeBuilder,
         NamingBuilder,
+        JsonContractBuilder,
     }
 
     private sealed class ParseContext(SemanticModel semanticModel)
@@ -637,5 +711,13 @@ internal static class ConfigurationParser
         /// Maps TypeBuilder lambda parameter names to the fully-qualified type name they configure.
         /// </summary>
         public Dictionary<string, string> TypeBuilderMap { get; } = new();
+
+        // JsonContract fields
+        public string? RootPropertyName { get; set; }
+        public Dictionary<string, string> CollectionJsonNames { get; } = new();
+        public HashSet<string> SeenCollectionTypes { get; } = new();
+
+        // Diagnostics collected during parse
+        public List<GeneratorDiagnosticInfo> Diagnostics { get; } = new();
     }
 }

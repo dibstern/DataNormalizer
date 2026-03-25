@@ -550,27 +550,299 @@ public sealed class ConfigurationParserTests
         Assert.That(model.Naming.EmitJsonPropertyNames, Is.True);
     }
 
+    // ---- UseJsonContract Tests ----
+
+    [Test]
+    public void Parse_UseJsonContract_RootPropertyName_Extracted()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c => { c.RootPropertyName = "result"; });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.RootPropertyName, Is.EqualTo("result"));
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_Collection_ExtractsJsonName()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c => { c.Collection<SearchLine>("lines"); });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.CollectionJsonNames, Has.Count.EqualTo(1));
+        Assert.That(model.JsonContract.CollectionJsonNames.Values, Does.Contain("lines"));
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_MultipleCollections_AllStored()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c =>
+                {
+                    c.Collection<SearchLine>("lines");
+                    c.Collection<Address>("addresses");
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            public class Address { public string Street { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.CollectionJsonNames, Has.Count.EqualTo(2));
+        Assert.That(model.JsonContract.CollectionJsonNames.Values, Does.Contain("lines"));
+        Assert.That(model.JsonContract.CollectionJsonNames.Values, Does.Contain("addresses"));
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_RootPropertyNameEmptyString_StoredAsEmpty()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c => { c.RootPropertyName = ""; });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.RootPropertyName, Is.EqualTo(""));
+    }
+
+    [Test]
+    public void Parse_NoUseJsonContract_ReturnsDefaultJsonContract()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>();
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.RootPropertyName, Is.Null);
+        Assert.That(model.JsonContract.CollectionJsonNames, Is.Empty);
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_BothRootAndCollections_AllExtracted()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c =>
+                {
+                    c.RootPropertyName = "result";
+                    c.Collection<SearchLine>("lines");
+                    c.Collection<Address>("addresses");
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            public class Address { public string Street { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.RootPropertyName, Is.EqualTo("result"));
+        Assert.That(model.JsonContract.CollectionJsonNames, Has.Count.EqualTo(2));
+        Assert.That(model.JsonContract.CollectionJsonNames.Values, Does.Contain("lines"));
+        Assert.That(model.JsonContract.CollectionJsonNames.Values, Does.Contain("addresses"));
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_EmptyLambdaBody_NoCrash_DefaultJsonContract()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c => { });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.RootPropertyName, Is.Null);
+        Assert.That(model.JsonContract.CollectionJsonNames, Is.Empty);
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_CalledTwice_LastWins()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c => { c.RootPropertyName = "first"; });
+                graph.UseJsonContract(c => { c.RootPropertyName = "second"; });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.RootPropertyName, Is.EqualTo("second"));
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_CollectionWithNonLiteralArg_SilentlySkipped()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                var name = "lines";
+                graph.UseJsonContract(c => { c.Collection<SearchLine>(name); });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.JsonContract.CollectionJsonNames, Is.Empty);
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_CollectionWithDifferentNamespaceType_FqnStoredCorrectly()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c => { c.Collection<OtherNamespace.Widget>("widgets"); });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """,
+            extraNamespaceTypes: """
+            namespace OtherNamespace
+            {
+                public class Widget { public string Id { get; set; } = ""; }
+            }
+            """
+        );
+
+        Assert.That(model.JsonContract.CollectionJsonNames, Has.Count.EqualTo(1));
+        Assert.That(model.JsonContract.CollectionJsonNames.ContainsKey("OtherNamespace.Widget"), Is.True);
+        Assert.That(model.JsonContract.CollectionJsonNames["OtherNamespace.Widget"], Is.EqualTo("widgets"));
+    }
+
+    [Test]
+    public void Parse_UseJsonContract_DuplicateCollectionSameType_DiagnosticDN1002()
+    {
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonContract(c =>
+                {
+                    c.Collection<SearchLine>("lines");
+                    c.Collection<SearchLine>("search_lines");
+                });
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            public class SearchLine { public string Text { get; set; } = ""; }
+            """
+        );
+
+        // Last value wins for the collection
+        Assert.That(model.JsonContract.CollectionJsonNames["TestApp.SearchLine"], Is.EqualTo("search_lines"));
+
+        // DN1002 diagnostic should be reported
+        Assert.That(model.Diagnostics, Has.Length.EqualTo(1));
+        Assert.That(model.Diagnostics[0].Id, Is.EqualTo("DN1002"));
+        Assert.That(model.Diagnostics[0].TypeName, Does.Contain("SearchLine"));
+    }
+
     // ---- Test Helper ----
 
-    private static NormalizationModel ParseConfig(string configureBody, string additionalTypes)
+    private static NormalizationModel ParseConfig(
+        string configureBody,
+        string additionalTypes,
+        string extraNamespaceTypes = ""
+    )
     {
-        var source = $$"""
-            using DataNormalizer.Attributes;
-            using DataNormalizer.Configuration;
+        string source;
+        if (string.IsNullOrEmpty(extraNamespaceTypes))
+        {
+            source = $$"""
+                using DataNormalizer.Attributes;
+                using DataNormalizer.Configuration;
 
-            namespace TestApp;
+                namespace TestApp;
 
-            {{additionalTypes}}
+                {{additionalTypes}}
 
-            [NormalizeConfiguration]
-            public partial class TestConfig : NormalizationConfig
-            {
-                protected override void Configure(NormalizeBuilder builder)
+                [NormalizeConfiguration]
+                public partial class TestConfig : NormalizationConfig
                 {
-                    {{configureBody}}
+                    protected override void Configure(NormalizeBuilder builder)
+                    {
+                        {{configureBody}}
+                    }
                 }
-            }
-            """;
+                """;
+        }
+        else
+        {
+            source = $$"""
+                using DataNormalizer.Attributes;
+                using DataNormalizer.Configuration;
+
+                namespace TestApp
+                {
+                    {{additionalTypes}}
+
+                    [NormalizeConfiguration]
+                    public partial class TestConfig : NormalizationConfig
+                    {
+                        protected override void Configure(NormalizeBuilder builder)
+                        {
+                            {{configureBody}}
+                        }
+                    }
+                }
+
+                {{extraNamespaceTypes}}
+                """;
+        }
 
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
 

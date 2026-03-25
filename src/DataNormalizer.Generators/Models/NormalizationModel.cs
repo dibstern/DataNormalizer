@@ -22,6 +22,9 @@ internal sealed class NormalizationModel
 
     public ImmutableDictionary<string, string> PropertyJsonNameOverrides { get; init; } =
         ImmutableDictionary<string, string>.Empty;
+
+    public ImmutableArray<GeneratorDiagnosticInfo> Diagnostics { get; init; } =
+        ImmutableArray<GeneratorDiagnosticInfo>.Empty;
 }
 
 internal sealed class RootTypeInfo

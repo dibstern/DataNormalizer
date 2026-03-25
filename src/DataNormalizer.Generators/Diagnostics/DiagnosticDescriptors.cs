@@ -39,4 +39,13 @@ internal static class DiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true
     );
+
+    public static readonly DiagnosticDescriptor DuplicateCollectionType = new(
+        id: "DN1002",
+        title: "Duplicate Collection<T> type",
+        messageFormat: "Collection<{0}> was already configured in this UseJsonContract block. Only the last value will be used.",
+        category: "DataNormalizer",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
 }
