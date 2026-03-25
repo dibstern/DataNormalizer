@@ -18,6 +18,10 @@ internal sealed class NormalizationModel
     public bool AutoDiscover { get; init; } = true;
     public bool UseReferenceTrackingForCycles { get; init; }
     public NamingModel Naming { get; init; } = NamingModel.Default;
+    public JsonContractModel JsonContract { get; init; } = JsonContractModel.Default;
+
+    public ImmutableDictionary<string, string> PropertyJsonNameOverrides { get; init; } =
+        ImmutableDictionary<string, string>.Empty;
 }
 
 internal sealed class RootTypeInfo

@@ -14,4 +14,5 @@ internal sealed class AnalyzedProperty
     public CollectionTypeKind CollectionKind { get; init; }
     public bool IsReferenceType { get; init; }
     public ImmutableArray<string> SourceAttributes { get; init; } = ImmutableArray<string>.Empty;
+    public string? JsonNameOverride { get; init; }
 }
