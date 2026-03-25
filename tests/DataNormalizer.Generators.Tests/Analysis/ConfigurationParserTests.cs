@@ -506,6 +506,50 @@ public sealed class ConfigurationParserTests
         Assert.That(model.Naming.EmitJsonPropertyNames, Is.True);
     }
 
+    // ---- UseJsonNaming + UseNaming Interaction/Ordering Tests ----
+
+    [Test]
+    public void Parse_UseJsonNamingThenUseNamingFalse_EmitJsonPropertyNamesFalse()
+    {
+        // UseJsonNaming bridge sets EmitJsonPropertyNames = true,
+        // but subsequent UseNaming(EmitJsonPropertyNames = false) should override it.
+        var model = ParseConfig(
+            """
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonNaming(System.Text.Json.JsonNamingPolicy.CamelCase);
+            });
+            builder.UseNaming(n => { n.EmitJsonPropertyNames = false; });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.EmitJsonPropertyNames, Is.False);
+    }
+
+    [Test]
+    public void Parse_UseNamingFalseThenUseJsonNaming_EmitJsonPropertyNamesTrue()
+    {
+        // UseNaming sets EmitJsonPropertyNames = false first,
+        // but subsequent UseJsonNaming bridge sets it back to true.
+        var model = ParseConfig(
+            """
+            builder.UseNaming(n => { n.EmitJsonPropertyNames = false; });
+            builder.NormalizeGraph<Person>(graph =>
+            {
+                graph.UseJsonNaming(System.Text.Json.JsonNamingPolicy.CamelCase);
+            });
+            """,
+            additionalTypes: """
+            public class Person { public string Name { get; set; } = ""; }
+            """
+        );
+
+        Assert.That(model.Naming.EmitJsonPropertyNames, Is.True);
+    }
+
     // ---- Test Helper ----
 
     private static NormalizationModel ParseConfig(string configureBody, string additionalTypes)
