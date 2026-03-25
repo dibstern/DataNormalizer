@@ -20,7 +20,7 @@ public sealed class DtoEmitterTests
             SimpleProp("Age", "int", isRef: false)
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(
             result,
@@ -42,7 +42,7 @@ public sealed class DtoEmitterTests
             NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("public int HomeAddressIndex { get; set; }"));
         Assert.That(result, Does.Not.Contain("public TestApp.Address"));
@@ -57,7 +57,7 @@ public sealed class DtoEmitterTests
             NormalizedProp("WorkAddress", "TestApp.Address", nullable: true)
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("public int? WorkAddressIndex { get; set; }"));
     }
@@ -75,7 +75,7 @@ public sealed class DtoEmitterTests
             )
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("public int[] PhoneNumbersIndices { get; set; }"));
     }
@@ -85,7 +85,7 @@ public sealed class DtoEmitterTests
     {
         var node = CreateNode("TestApp.Person", "Person", InlinedProp("Meta", "TestApp.Metadata", isRef: true));
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("public TestApp.Metadata Meta { get; set; }"));
     }
@@ -108,7 +108,7 @@ public sealed class DtoEmitterTests
             InlinedProp("Meta", "TestApp.Metadata", isRef: true)
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("public string Name { get; set; }"));
         Assert.That(result, Does.Contain("public int Age { get; set; }"));
@@ -128,7 +128,7 @@ public sealed class DtoEmitterTests
             SimpleProp("Age", "int", isRef: false)
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("public bool Equals(PersonDto? other)"));
         Assert.That(result, Does.Contain("if (other is null) return false;"));
@@ -145,7 +145,7 @@ public sealed class DtoEmitterTests
             SimpleProp("Age", "int", isRef: false)
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("GetHashCode()"));
         // Reference type should have null-safe hash
@@ -167,7 +167,7 @@ public sealed class DtoEmitterTests
             SimpleProp("Age", "int", isRef: false)
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         // Cache fields should be present in the class body
         Assert.That(result, Does.Contain("private int _cachedHashCode;"));
@@ -192,7 +192,7 @@ public sealed class DtoEmitterTests
             )
         );
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         // Array equality must use SequenceEqual, not ==
         Assert.That(result, Does.Contain("SequenceEqual"));
@@ -203,7 +203,7 @@ public sealed class DtoEmitterTests
     {
         var node = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("[System.CodeDom.Compiler.GeneratedCode(\"DataNormalizer\""));
     }
@@ -213,7 +213,7 @@ public sealed class DtoEmitterTests
     {
         var node = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("#nullable enable"));
     }
@@ -223,7 +223,7 @@ public sealed class DtoEmitterTests
     {
         var node = CreateNode("TestApp.Order", "Order", SimpleProp("Status", "TestApp.OrderStatus", isRef: false));
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         Assert.That(result, Does.Contain("public TestApp.OrderStatus Status { get; set; }"));
     }
@@ -432,7 +432,7 @@ public sealed class DtoEmitterTests
             ),
         };
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         // Equals should compare Label but NOT ParentIndex or ChildrenIndices
         Assert.That(result, Does.Contain("Label == other.Label"));
@@ -482,7 +482,7 @@ public sealed class DtoEmitterTests
             ),
         };
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         // Equals should compare Name and DepartmentIndex but NOT MentorIndex
         Assert.That(result, Does.Contain("DepartmentIndex"));
@@ -510,7 +510,7 @@ public sealed class DtoEmitterTests
             ),
         };
 
-        var result = DtoEmitter.Emit(node);
+        var result = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
 
         // With all properties circular, Equals should return true
         Assert.That(result, Does.Contain("return true;"));
@@ -603,21 +603,6 @@ public sealed class DtoEmitterTests
             result,
             Does.Contain("public partial class NormalizedPerson : System.IEquatable<NormalizedPerson>")
         );
-    }
-
-    [Test]
-    public void Emit_DefaultNaming_ConvenienceOverload_UsesDefaultNamingModel()
-    {
-        var node = CreateNode(
-            "TestApp.Person",
-            "Person",
-            SimpleProp("Name", "string", isRef: true)
-        );
-
-        var convenienceResult = DtoEmitter.Emit(node);
-        var explicitResult = DtoEmitter.Emit(node, copySourceAttributes: false, naming: DefaultNaming);
-
-        Assert.That(convenienceResult, Is.EqualTo(explicitResult));
     }
 
     // ---- Helpers ----

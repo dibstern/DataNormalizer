@@ -7,7 +7,6 @@ internal static class EmitterHelpers
 {
     public const string GeneratorName = "DataNormalizer";
     public const string GeneratorVersion = "1.0.0";
-    public const string CamelCasePolicy = "CamelCase";
     public const int HashSeed = 17;
     public const int HashMultiplier = 397;
 
@@ -51,13 +50,6 @@ internal static class EmitterHelpers
         return lastDot > 0 ? typeFullName.Substring(0, lastDot) : "";
     }
 
-    public static string GetDtoFullName(string typeFullName, string typeName)
-    {
-        var ns = GetNamespace(typeFullName);
-        var dtoName = $"Normalized{typeName}";
-        return string.IsNullOrEmpty(ns) ? dtoName : $"{ns}.{dtoName}";
-    }
-
     public static string GetShortTypeName(string typeFullName)
     {
         var lastDot = typeFullName.LastIndexOf('.');
@@ -87,32 +79,6 @@ internal static class EmitterHelpers
         return node.TypeName;
     }
 
-    public static string GetListPropertyName(TypeGraphNode node, IReadOnlyList<TypeGraphNode> allNodes)
-    {
-        var count = 0;
-        for (var i = 0; i < allNodes.Count; i++)
-        {
-            if (allNodes[i].TypeName == node.TypeName)
-            {
-                count++;
-            }
-        }
-
-        if (count <= 1)
-        {
-            return $"{node.TypeName}List";
-        }
-
-        var ns = GetNamespace(node.TypeFullName);
-        if (string.IsNullOrEmpty(ns))
-        {
-            return $"{node.TypeName}List";
-        }
-
-        var prefix = ns.Replace(".", "");
-        return $"{prefix}{node.TypeName}List";
-    }
-
     public static string ToPlural(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -138,15 +104,6 @@ internal static class EmitterHelpers
 
         return name + "s";
     }
-
-    public static string GetContainerFullName(string typeFullName, string typeName)
-    {
-        var ns = GetNamespace(typeFullName);
-        var containerName = $"Normalized{typeName}Result";
-        return string.IsNullOrEmpty(ns) ? containerName : $"{ns}.{containerName}";
-    }
-
-    // ---- Naming-aware overloads ----
 
     public static string GetDtoName(string typeName, NamingModel naming)
     {

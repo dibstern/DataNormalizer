@@ -41,7 +41,7 @@ Console.WriteLine();
 
 var result = SampleNormalization.Normalize(order);
 
-var root = result.OrderList[0];
+var root = result.OrderDtos[0];
 
 Console.WriteLine("--- Normalized Structure ---");
 Console.WriteLine($"Root OrderId: {root.OrderId}");
@@ -51,20 +51,20 @@ Console.WriteLine($"Root OrderLine indices: [{string.Join(", ", root.LinesIndice
 Console.WriteLine();
 
 Console.WriteLine("--- Collections ---");
-Console.WriteLine($"  OrderList: {result.OrderList.Length}");
-Console.WriteLine($"  CustomerList: {result.CustomerList.Length}");
-Console.WriteLine($"  AddressList: {result.AddressList.Length}");
-Console.WriteLine($"  OrderLineList: {result.OrderLineList.Length}");
-Console.WriteLine($"  ProductList: {result.ProductList.Length}");
+Console.WriteLine($"  OrderDtos: {result.OrderDtos.Length}");
+Console.WriteLine($"  CustomerDtos: {result.CustomerDtos.Length}");
+Console.WriteLine($"  AddressDtos: {result.AddressDtos.Length}");
+Console.WriteLine($"  OrderLineDtos: {result.OrderLineDtos.Length}");
+Console.WriteLine($"  ProductDtos: {result.ProductDtos.Length}");
 Console.WriteLine();
 
 // Demonstrate deduplication
-var addresses = result.AddressList;
+var addresses = result.AddressDtos;
 Console.WriteLine($"Addresses in collection: {addresses.Length}");
 Console.WriteLine($"  (Billing and Shipping share the same address -> deduplicated to 1 entry)");
 Console.WriteLine();
 
-var products = result.ProductList;
+var products = result.ProductDtos;
 Console.WriteLine($"Products in collection: {products.Length}");
 Console.WriteLine($"  Widget appears in 2 order lines but is stored once (dedup)");
 Console.WriteLine($"  Gadget is a separate product");
@@ -216,24 +216,24 @@ Console.WriteLine();
 var corpResult = CorporateNormalization.Normalize(corp);
 
 Console.WriteLine("--- Collections ---");
-Console.WriteLine($"  CorporationList: {corpResult.CorporationList.Length}");
-Console.WriteLine($"  DivisionList: {corpResult.DivisionList.Length}");
-Console.WriteLine($"  DepartmentList: {corpResult.DepartmentList.Length}");
-Console.WriteLine($"  TeamList: {corpResult.TeamList.Length}");
-Console.WriteLine($"  EmployeeList: {corpResult.EmployeeList.Length}");
-Console.WriteLine($"  CertificationList: {corpResult.CertificationList.Length}");
-Console.WriteLine($"  SkillList: {corpResult.SkillList.Length}");
+Console.WriteLine($"  CorporationDtos: {corpResult.CorporationDtos.Length}");
+Console.WriteLine($"  DivisionDtos: {corpResult.DivisionDtos.Length}");
+Console.WriteLine($"  DepartmentDtos: {corpResult.DepartmentDtos.Length}");
+Console.WriteLine($"  TeamDtos: {corpResult.TeamDtos.Length}");
+Console.WriteLine($"  EmployeeDtos: {corpResult.EmployeeDtos.Length}");
+Console.WriteLine($"  CertificationDtos: {corpResult.CertificationDtos.Length}");
+Console.WriteLine($"  SkillDtos: {corpResult.SkillDtos.Length}");
 Console.WriteLine();
 
 // Show deduplication
 Console.WriteLine("--- Deduplication ---");
-var employees = corpResult.EmployeeList;
+var employees = corpResult.EmployeeDtos;
 Console.WriteLine($"  Employees: {employees.Length} (Alice appears once despite being in Alpha + Beta teams)");
-var certifications = corpResult.CertificationList;
+var certifications = corpResult.CertificationDtos;
 Console.WriteLine(
     $"  Certifications: {certifications.Length} (basicCert appears once despite Alice + Bob both having it)"
 );
-var teams = corpResult.TeamList;
+var teams = corpResult.TeamDtos;
 Console.WriteLine($"  Teams: {teams.Length} (alphaTeam appears once despite Engineering + R&D sharing it)");
 Console.WriteLine();
 

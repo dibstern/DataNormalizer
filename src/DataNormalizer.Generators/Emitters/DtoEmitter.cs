@@ -5,23 +5,6 @@ namespace DataNormalizer.Generators.Emitters;
 
 internal static class DtoEmitter
 {
-    public static string Emit(TypeGraphNode node) =>
-        Emit(node, copySourceAttributes: false, naming: NamingModel.Default);
-
-    /// <summary>
-    /// Legacy overload — will be removed in Task 10 when NormalizeGenerator is updated.
-    /// </summary>
-    public static string Emit(TypeGraphNode node, bool copySourceAttributes, string? jsonNamingPolicy)
-    {
-        var naming = new NamingModel
-        {
-            DtoPrefix = "Normalized",
-            DtoSuffix = "",
-            EmitJsonPropertyNames = jsonNamingPolicy != null,
-        };
-        return Emit(node, copySourceAttributes, naming);
-    }
-
     public static string Emit(TypeGraphNode node, bool copySourceAttributes, NamingModel naming)
     {
         var sb = new StringBuilder();

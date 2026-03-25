@@ -15,7 +15,6 @@ internal sealed class NormalizationModel
     public ImmutableHashSet<string> InlinedTypes { get; init; } = ImmutableHashSet<string>.Empty;
     public ImmutableHashSet<string> ExplicitTypes { get; init; } = ImmutableHashSet<string>.Empty;
     public bool CopySourceAttributes { get; init; }
-    public string? JsonNamingPolicy { get; init; }
     public bool AutoDiscover { get; init; } = true;
     public bool UseReferenceTrackingForCycles { get; init; }
     public NamingModel Naming { get; init; } = NamingModel.Default;

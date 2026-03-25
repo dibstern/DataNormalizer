@@ -262,19 +262,6 @@ public sealed class ContainerEmitterTests
         Assert.That(result, Does.Contain("PersonList"));
     }
 
-    [Test]
-    public void Emit_LegacyOverload_ProducesOldStyleNames()
-    {
-        var personNode = CreateNode("TestApp.Person", "Person", SimpleProp("Name", "string", isRef: true));
-        var allNodes = new List<TypeGraphNode> { personNode };
-
-        var result = ContainerEmitter.Emit(personNode, allNodes, jsonNamingPolicy: null);
-
-        Assert.That(result, Does.Contain("NormalizedPersonResult"));
-        Assert.That(result, Does.Contain("NormalizedPerson[]"));
-        Assert.That(result, Does.Contain("PersonList"));
-    }
-
     // ---- Helpers ----
 
     private static TypeGraphNode CreateNode(string fullName, string name, params AnalyzedProperty[] props)

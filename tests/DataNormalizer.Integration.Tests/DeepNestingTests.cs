@@ -12,19 +12,19 @@ public sealed class DeepNestingTests
         var universe = CreateDeepUniverse();
 
         var result = DeepNestingConfig.Normalize(universe);
-        var root = result.UniverseList[0];
+        var root = result.UniverseDtos[0];
 
         Assert.That(root, Is.Not.Null);
         Assert.That(root.Name, Is.EqualTo("Observable Universe"));
 
         // Should have collections for all 7 types
-        Assert.That(result.UniverseList, Has.Length.GreaterThanOrEqualTo(1));
-        Assert.That(result.GalaxyList, Has.Length.GreaterThanOrEqualTo(1));
-        Assert.That(result.SolarSystemList, Has.Length.GreaterThanOrEqualTo(1));
-        Assert.That(result.PlanetList, Has.Length.GreaterThanOrEqualTo(1));
-        Assert.That(result.ContinentList, Has.Length.GreaterThanOrEqualTo(1));
-        Assert.That(result.CountryList, Has.Length.GreaterThanOrEqualTo(1));
-        Assert.That(result.CityList, Has.Length.GreaterThanOrEqualTo(1));
+        Assert.That(result.UniverseDtos, Has.Length.GreaterThanOrEqualTo(1));
+        Assert.That(result.GalaxyDtos, Has.Length.GreaterThanOrEqualTo(1));
+        Assert.That(result.SolarSystemDtos, Has.Length.GreaterThanOrEqualTo(1));
+        Assert.That(result.PlanetDtos, Has.Length.GreaterThanOrEqualTo(1));
+        Assert.That(result.ContinentDtos, Has.Length.GreaterThanOrEqualTo(1));
+        Assert.That(result.CountryDtos, Has.Length.GreaterThanOrEqualTo(1));
+        Assert.That(result.CityDtos, Has.Length.GreaterThanOrEqualTo(1));
     }
 
     [Test]

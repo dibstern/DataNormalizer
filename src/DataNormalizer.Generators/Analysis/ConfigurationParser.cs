@@ -47,7 +47,6 @@ internal static class ConfigurationParser
             InlinedTypes = context.InlinedTypes.ToImmutable(),
             ExplicitTypes = context.ExplicitTypes.ToImmutable(),
             CopySourceAttributes = context.CopySourceAttributes,
-            JsonNamingPolicy = context.JsonNamingPolicy,
             AutoDiscover = autoDiscover,
             UseReferenceTrackingForCycles = context.UseReferenceTrackingForCycles,
             Naming = new NamingModel
@@ -162,7 +161,6 @@ internal static class ConfigurationParser
                 return ReceiverKind.GraphBuilder;
 
             case "UseJsonNaming" when receiverKind == ReceiverKind.GraphBuilder:
-                context.JsonNamingPolicy = "CamelCase";
                 context.GlobalEmitJsonPropertyNames = true;
                 return ReceiverKind.GraphBuilder;
 
@@ -609,8 +607,6 @@ internal static class ConfigurationParser
         public ImmutableHashSet<string>.Builder ExplicitTypes { get; } = ImmutableHashSet.CreateBuilder<string>();
 
         public bool CopySourceAttributes { get; set; }
-
-        public string? JsonNamingPolicy { get; set; }
 
         public bool UseReferenceTrackingForCycles { get; set; }
 
