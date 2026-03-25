@@ -4,7 +4,7 @@ _layout: landing
 
 # DataNormalizer
 
-A .NET source generator that normalizes nested object graphs into flat, deduplicated representations.
+A .NET source generator that normalizes nested object graphs into flat, deduplicated, JSON-serializable containers.
 
 [![CI](https://github.com/dibstern/DataNormalizer/actions/workflows/ci.yml/badge.svg)](https://github.com/dibstern/DataNormalizer/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/DataNormalizer.svg)](https://www.nuget.org/packages/DataNormalizer)
@@ -12,18 +12,21 @@ A .NET source generator that normalizes nested object graphs into flat, deduplic
 
 ## What It Does
 
-**Before** — nested objects with shared references:
+**Before** — nested routes with repeated carriers and places:
 
 ```csharp
-var sharedAddress = new Address { City = "Seattle", Zip = "98101" };
+var seattle = new Place { Name = "Seattle" };
+var carrier = new Carrier { Name = "FastFreight" };
 
-var team = new Team
+var routes = new[]
 {
-    Name = "Engineering",
-    Members = new[]
+    new Route
     {
-        new Person { Name = "Alice", Home = sharedAddress },
-        new Person { Name = "Bob",   Home = sharedAddress },
+        Hops = new[]
+        {
+            new Hop { Origin = seattle, Destination = new Place { Name = "Portland" }, Carrier = carrier },
+            new Hop { Origin = new Place { Name = "Portland" }, Destination = new Place { Name = "Denver" }, Carrier = carrier },
+        },
     },
 };
 ```
@@ -32,20 +35,26 @@ var team = new Team
 
 ```json
 {
-  "TeamList": [
-    { "Name": "Engineering", "MembersIndices": [0, 1] }
+  "result": [0],
+  "routeDtos": [
+    { "hopsIndices": [0, 1] }
   ],
-  "PersonList": [
-    { "Name": "Alice", "HomeIndex": 0 },
-    { "Name": "Bob",   "HomeIndex": 0 }
+  "hopDtos": [
+    { "originIndex": 0, "destinationIndex": 1, "carrierIndex": 0 },
+    { "originIndex": 1, "destinationIndex": 2, "carrierIndex": 0 }
   ],
-  "AddressList": [
-    { "City": "Seattle", "Zip": "98101" }
+  "carrierDtos": [
+    { "name": "FastFreight" }
+  ],
+  "placeDtos": [
+    { "name": "Seattle" },
+    { "name": "Portland" },
+    { "name": "Denver" }
   ]
 }
 ```
 
-Shared `Address` instances are stored once. References become integer indices into typed arrays.
+Shared `Carrier` and `Place` instances are stored once. References become integer indices into typed arrays.
 
 ## Get Started
 
@@ -55,6 +64,8 @@ dotnet add package DataNormalizer
 
 - [Getting Started](articles/getting-started.md) — Quick tutorial
 - [Configuration Guide](articles/configuration.md) — All configuration options
+- [Naming & JSON Contracts](articles/naming-and-json.md) — Dto suffixes, camelCase JSON, and property conventions
+- [Why Gzip Isn't Enough](articles/why-gzip-isnt-enough.md) — Why structural dedup beats compression alone
 - [Diagnostics Reference](articles/diagnostics.md) — Compiler diagnostics DN0001–DN0004
 - [API Reference](api/index.md) — Full API documentation
 
