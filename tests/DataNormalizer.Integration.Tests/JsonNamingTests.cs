@@ -115,4 +115,134 @@ public sealed class JsonNamingTests
         Assert.That(json, Does.Not.Contain("\"contactDtos\""));
         Assert.That(json, Does.Not.Contain("\"locationDtos\""));
     }
+
+    // --- Gap 1: DtoPrefix tests ---
+
+    private static TestTypes.DtoPrefix.Contact CreateDtoPrefixContact() =>
+        new()
+        {
+            Name = "Alice",
+            Age = 30,
+            HomeAddress = new TestTypes.DtoPrefix.Location
+            {
+                Street = "123 Main St",
+                City = "Springfield",
+            },
+        };
+
+    [Test]
+    public void DtoPrefix_ContainerTypeNameUnchanged()
+    {
+        var contact = CreateDtoPrefixContact();
+        var result = DtoPrefixNamingConfig.Normalize(contact);
+
+        // DtoPrefix does not apply to containers — container is always {TypeName}Result{ContainerSuffix}
+        Assert.That(result.GetType().Name, Is.EqualTo("ContactResultDto"));
+    }
+
+    [Test]
+    public void DtoPrefix_EmptySuffix_JsonUsesListFallback()
+    {
+        var contact = CreateDtoPrefixContact();
+        var result = DtoPrefixNamingConfig.Normalize(contact);
+        var json = JsonSerializer.Serialize(result);
+
+        // DtoSuffix = "" → list property falls back to "{baseName}List" pattern
+        // camelCase in JSON: "contactList", "locationList"
+        Assert.That(json, Does.Contain("\"contactList\""));
+        Assert.That(json, Does.Contain("\"locationList\""));
+    }
+
+    [Test]
+    public void DtoPrefix_DtoTypesHavePrefixAndNoSuffix()
+    {
+        var contact = CreateDtoPrefixContact();
+        var result = DtoPrefixNamingConfig.Normalize(contact);
+
+        // DTO name = {DtoPrefix}{TypeName}{DtoSuffix} = "Flat" + "Contact" + "" = "FlatContact"
+        var containerType = result.GetType();
+        var contactListProp = containerType.GetProperty("ContactList");
+        Assert.That(contactListProp, Is.Not.Null, "Expected ContactList property on container");
+
+        var elementType = contactListProp!.PropertyType.GetElementType();
+        Assert.That(elementType, Is.Not.Null);
+        Assert.That(elementType!.Name, Is.EqualTo("FlatContact"));
+    }
+
+    // --- Gap 2: ContainerSuffix tests ---
+
+    private static TestTypes.ContainerSuffix.Contact CreateContainerSuffixContact() =>
+        new()
+        {
+            Name = "Alice",
+            Age = 30,
+            HomeAddress = new TestTypes.ContainerSuffix.Location
+            {
+                Street = "123 Main St",
+                City = "Springfield",
+            },
+        };
+
+    [Test]
+    public void ContainerSuffix_EmptySuffix_ContainerNameHasNoDto()
+    {
+        var contact = CreateContainerSuffixContact();
+        var result = ContainerSuffixNamingConfig.Normalize(contact);
+
+        // ContainerSuffix = "" → container is "ContactResult" (no "Dto" suffix)
+        Assert.That(result.GetType().Name, Is.EqualTo("ContactResult"));
+    }
+
+    [Test]
+    public void ContainerSuffix_DtoNamesStillUseDefaultSuffix()
+    {
+        var contact = CreateContainerSuffixContact();
+        var result = ContainerSuffixNamingConfig.Normalize(contact);
+        var json = JsonSerializer.Serialize(result);
+
+        // DtoSuffix is still default "Dto" → list properties are "contactDtos", "locationDtos"
+        Assert.That(json, Does.Contain("\"contactDtos\""));
+        Assert.That(json, Does.Contain("\"locationDtos\""));
+    }
+
+    // --- Gap 3: Graph-level UseNaming override tests ---
+
+    private static TestTypes.GraphNaming.Contact CreateGraphNamingContact() =>
+        new()
+        {
+            Name = "Alice",
+            Age = 30,
+            HomeAddress = new TestTypes.GraphNaming.Location
+            {
+                Street = "123 Main St",
+                City = "Springfield",
+            },
+        };
+
+    [Test]
+    public void GraphNaming_GraphOverridesGlobalDtoSuffix()
+    {
+        var contact = CreateGraphNamingContact();
+        var result = GraphNamingConfig.Normalize(contact);
+        var json = JsonSerializer.Serialize(result);
+
+        // Global DtoSuffix = "Record", but graph overrides with "View"
+        // → list properties use "View" suffix: "contactViews", "locationViews"
+        Assert.That(json, Does.Contain("\"contactViews\""));
+        Assert.That(json, Does.Contain("\"locationViews\""));
+
+        // Should NOT contain the global "Record" suffix
+        Assert.That(json, Does.Not.Contain("\"contactRecords\""));
+        Assert.That(json, Does.Not.Contain("\"locationRecords\""));
+    }
+
+    [Test]
+    public void GraphNaming_ContainerUsesDefaultContainerSuffix()
+    {
+        var contact = CreateGraphNamingContact();
+        var result = GraphNamingConfig.Normalize(contact);
+
+        // ContainerSuffix not overridden at graph level → uses default "Dto"
+        Assert.That(result.GetType().Name, Is.EqualTo("ContactResultDto"));
+    }
 }

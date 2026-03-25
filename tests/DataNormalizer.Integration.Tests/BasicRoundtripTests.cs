@@ -198,4 +198,27 @@ public sealed class BasicRoundtripTests
         Assert.That(restored.Description, Is.EqualTo("Test Order"));
         Assert.That(restored.ShippingAddress.Street, Is.EqualTo("789 Elm St"));
     }
+
+    [Test]
+    public void Roundtrip_CustomSuffixNaming_AllPropertiesPreserved()
+    {
+        var contact = new TestTypes.CustomSuffix.Contact
+        {
+            Name = "Bob",
+            Age = 25,
+            HomeAddress = new TestTypes.CustomSuffix.Location
+            {
+                Street = "456 Oak Ave",
+                City = "Capital City",
+            },
+        };
+
+        var result = CustomSuffixNamingConfig.Normalize(contact);
+        var restored = CustomSuffixNamingConfig.Denormalize(result);
+
+        Assert.That(restored.Name, Is.EqualTo("Bob"));
+        Assert.That(restored.Age, Is.EqualTo(25));
+        Assert.That(restored.HomeAddress.Street, Is.EqualTo("456 Oak Ave"));
+        Assert.That(restored.HomeAddress.City, Is.EqualTo("Capital City"));
+    }
 }
