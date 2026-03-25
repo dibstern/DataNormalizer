@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using DataNormalizer.Generators.Emitters;
 using DataNormalizer.Generators.Models;
+using DataNormalizer.Generators.Tests.TestUtilities;
 using NUnit.Framework;
 
 namespace DataNormalizer.Generators.Tests.Emitters;
@@ -196,6 +197,105 @@ public sealed class DenormalizerEmitterTests
         // Container properties use TypeName, not custom name
         Assert.That(result, Does.Contain("normalized.PersonDtos"));
         Assert.That(result, Does.Not.Contain("GetCollection"));
+    }
+
+    // ---- Root Property Behavior Tests ----
+
+    [Test]
+    public void Emit_RootNeedsListFalse_CreatesSingleElementArrayFromResult()
+    {
+        var personNode = ModelFactories.CreateNode(
+            "TestApp.Person",
+            "Person",
+            hasCircularReference: false,
+            isRootType: true,
+            needsList: false,
+            SimpleProp("Name", "string", isRef: true),
+            SimpleProp("Age", "int", isRef: false)
+        );
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+
+        var result = DenormalizerEmitter.Emit(model, new[] { personNode });
+
+        // Should create a single-element array from normalized.Result
+        Assert.That(result, Does.Contain("new TestApp.PersonDto[] { normalized.Result }"));
+        // Should NOT read from a list property
+        Assert.That(result, Does.Not.Contain("normalized.PersonDtos"));
+    }
+
+    [Test]
+    public void Emit_RootNeedsListTrue_ReadsFromListProperty()
+    {
+        var personNode = ModelFactories.CreateNode(
+            "TestApp.Person",
+            "Person",
+            hasCircularReference: false,
+            isRootType: true,
+            needsList: true,
+            SimpleProp("Name", "string", isRef: true),
+            SimpleProp("Age", "int", isRef: false)
+        );
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+
+        var result = DenormalizerEmitter.Emit(model, new[] { personNode });
+
+        // Should read from the list property
+        Assert.That(result, Does.Contain("normalized.PersonDtos"));
+        // Should NOT create a single-element array
+        Assert.That(result, Does.Not.Contain("normalized.Result"));
+    }
+
+    [Test]
+    public void Emit_NonRootType_ReadsFromListProperty()
+    {
+        var personNode = ModelFactories.CreateNode(
+            "TestApp.Person",
+            "Person",
+            hasCircularReference: false,
+            isRootType: true,
+            needsList: true,
+            SimpleProp("Name", "string", isRef: true),
+            NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
+        );
+        var addressNode = CreateNode(
+            "TestApp.Address",
+            "Address",
+            SimpleProp("Street", "string", isRef: true)
+        );
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+
+        var result = DenormalizerEmitter.Emit(model, new[] { personNode, addressNode });
+
+        // Non-root type always reads from its list property
+        Assert.That(result, Does.Contain("normalized.AddressDtos"));
+    }
+
+    [Test]
+    public void Emit_RootIdentification_UsesIsRootTypeFlag()
+    {
+        // Root with NeedsList=false should use Result; non-root should use list
+        var personNode = ModelFactories.CreateNode(
+            "TestApp.Person",
+            "Person",
+            hasCircularReference: false,
+            isRootType: true,
+            needsList: false,
+            SimpleProp("Name", "string", isRef: true),
+            NormalizedProp("HomeAddress", "TestApp.Address", nullable: false)
+        );
+        var addressNode = CreateNode(
+            "TestApp.Address",
+            "Address",
+            SimpleProp("Street", "string", isRef: true)
+        );
+        var model = CreateModel("TestConfig", "TestApp", "TestApp.Person");
+
+        var result = DenormalizerEmitter.Emit(model, new[] { personNode, addressNode });
+
+        // Root type (IsRootType=true, NeedsList=false) uses Result
+        Assert.That(result, Does.Contain("new TestApp.PersonDto[] { normalized.Result }"));
+        // Non-root type (IsRootType=false by default) uses list property
+        Assert.That(result, Does.Contain("normalized.AddressDtos"));
     }
 
     // ---- Scenario Builders ----
