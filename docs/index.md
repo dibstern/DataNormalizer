@@ -64,9 +64,9 @@ dotnet add package DataNormalizer
 
 - [Getting Started](articles/getting-started.md) — Quick tutorial
 - [Configuration Guide](articles/configuration.md) — All configuration options
-- [Naming & JSON Contracts](articles/naming-and-json.md) — Dto suffixes, camelCase JSON, and property conventions
+- [Naming & JSON Contracts](articles/naming-and-contracts.md) — Dto suffixes, camelCase JSON, and wire format customization
 - [Why Gzip Isn't Enough](articles/why-gzip-isnt-enough.md) — Why structural dedup beats compression alone
-- [Diagnostics Reference](articles/diagnostics.md) — Compiler diagnostics DN0001–DN0004
+- [Diagnostics Reference](articles/diagnostics.md) — Compiler diagnostics DN0001–DN1002
 - [API Reference](api/index.md) — Full API documentation
 
 ## Target Frameworks
