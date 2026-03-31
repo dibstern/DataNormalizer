@@ -6,7 +6,7 @@ Yes. Gzip compresses repeated byte sequences; normalization removes repeated *st
 
 ## The benchmark
 
-Measured on a real transport search API response (Melbourne to Sydney route search) containing routes, segments, hops, shared carriers, and shared places.
+Measured on a real transport search API response (Bicester to Sainte-Marie-aux-Mines route search) containing routes, segments, hops, shared carriers, and shared places.
 
 ### Minified JSON
 
