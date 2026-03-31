@@ -62,7 +62,7 @@ Measured on a real transport search API response:
 
 **Raw savings: 368 KB (2.1x smaller). Gzipped savings: 63 KB (2.1x smaller).**
 
-Normalize first, gzip second. See [Why Gzip Isn't Enough](https://dibstern.github.io/DataNormalizer/docs/why-gzip-isnt-enough.html) for the full analysis.
+Normalize first, gzip second. See [Why Gzip Isn't Enough](https://dibstern.github.io/DataNormalizer/articles/why-gzip-isnt-enough.html) for the full analysis.
 
 ## Quick Start
 
