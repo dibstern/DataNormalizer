@@ -64,7 +64,7 @@ Run: dotnet csharpier .
 **Task 3 amendment:** Install all SDKs in every workflow job instead of matrix:
 ```yaml
 - name: Setup .NET
-  uses: actions/setup-dotnet@v4
+  uses: actions/setup-dotnet@v5
   with:
     dotnet-version: |
       8.0.x

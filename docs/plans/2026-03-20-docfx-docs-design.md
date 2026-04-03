@@ -63,8 +63,8 @@ New file: `.github/workflows/docs.yml`
   2. Install .NET SDK 8.x
   3. Install DocFX (`dotnet tool update -g docfx`)
   4. Run `docfx docs/docfx.json`
-  5. Upload `docs/_site` via `actions/upload-pages-artifact@v3`
-  6. Deploy via `actions/deploy-pages@v4`
+  5. Upload `docs/_site` via `actions/upload-pages-artifact@v4`
+  6. Deploy via `actions/deploy-pages@v5`
 - **Permissions:** `pages: write`, `id-token: write`
 - **Concurrency:** Single deployment, no cancellation of in-progress runs.
 

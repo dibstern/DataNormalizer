@@ -148,11 +148,11 @@ var restored = SearchNormalizer.Denormalize(result);
 
 ## Documentation
 
-- [Getting Started](https://dibstern.github.io/DataNormalizer/docs/getting-started.html)
-- [Configuration Guide](https://dibstern.github.io/DataNormalizer/docs/configuration-guide.html)
-- [Naming & JSON Contracts](https://dibstern.github.io/DataNormalizer/docs/naming-and-json-contracts.html)
-- [Why Gzip Isn't Enough](https://dibstern.github.io/DataNormalizer/docs/why-gzip-isnt-enough.html)
-- [Diagnostics Reference](https://dibstern.github.io/DataNormalizer/docs/diagnostics-reference.html)
+- [Getting Started](https://dibstern.github.io/DataNormalizer/articles/getting-started.html)
+- [Configuration Guide](https://dibstern.github.io/DataNormalizer/articles/configuration-guide.html)
+- [Naming & JSON Contracts](https://dibstern.github.io/DataNormalizer/articles/naming-and-json-contracts.html)
+- [Why Gzip Isn't Enough](https://dibstern.github.io/DataNormalizer/articles/why-gzip-isnt-enough.html)
+- [Diagnostics Reference](https://dibstern.github.io/DataNormalizer/articles/diagnostics-reference.html)
 - [API Reference](https://dibstern.github.io/DataNormalizer/api/)
 
 ## Target Frameworks
