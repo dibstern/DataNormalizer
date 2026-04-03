@@ -1,5 +1,4 @@
 ---
-_layout: landing
 ---
 
 # DataNormalizer
