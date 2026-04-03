@@ -74,7 +74,7 @@ DocFX typically only needs to build for one target framework (it can be configur
 **Amendment (Option A — match existing workflows):** Install all required .NET SDKs:
 ```yaml
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -102,15 +102,15 @@ The only minor risk: if the release workflow fails (e.g., NuGet push rejected), 
 
 **Action:** Accept
 
-**Details:** The workflow references `environment: name: github-pages` and uses `actions/deploy-pages@v4`, which requires GitHub Pages to be enabled in the repository settings with the source set to "GitHub Actions". The plan does address this in "Post-Implementation: Enable GitHub Pages" (implementation plan lines 458-466), which is correctly placed after all code tasks. This is informational — no plan change needed, but the implementer should be aware this is a manual step that cannot be automated.
+**Details:** The workflow references `environment: name: github-pages` and uses `actions/deploy-pages@v5`, which requires GitHub Pages to be enabled in the repository settings with the source set to "GitHub Actions". The plan does address this in "Post-Implementation: Enable GitHub Pages" (implementation plan lines 458-466), which is correctly placed after all code tasks. This is informational — no plan change needed, but the implementer should be aware this is a manual step that cannot be automated.
 
 ---
 
-### Finding 7: `actions/upload-pages-artifact@v3` — version check
+### Finding 7: `actions/upload-pages-artifact@v4` — version check
 
 **Action:** Accept
 
-**Details:** The workflow uses `actions/upload-pages-artifact@v3` and `actions/deploy-pages@v4`. As of the plan's date (March 2026), these are current major versions. `actions/checkout@v4` and `actions/setup-dotnet@v4` also match the versions used in the existing `ci.yml` and `release.yml`. All action versions are consistent and current.
+**Details:** The workflow uses `actions/upload-pages-artifact@v4` and `actions/deploy-pages@v5`. As of the plan's date (March 2026), these are current major versions. `actions/checkout@v6` and `actions/setup-dotnet@v5` also match the versions used in the existing `ci.yml` and `release.yml`. All action versions are consistent and current.
 
 ---
 
