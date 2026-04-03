@@ -158,7 +158,7 @@ For full details, see [Naming & JSON Contracts](naming-and-contracts.md).
 Each `NormalizeGraph<T>()` produces a container DTO (`{RootType}ResultDto`) that provides access to the flat, deduplicated collections as typed arrays:
 
 ```csharp
-var result = AppNormalization.Normalize(team);
+var result = SearchNormalizer.Normalize(team);
 
 result.Result                            // TeamDto — the root DTO
 result.PersonDtos                        // PersonDto[] (typed array)

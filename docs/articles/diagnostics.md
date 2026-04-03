@@ -40,11 +40,11 @@ The class marked with `[NormalizeConfiguration]` is missing the `partial` keywor
 ```csharp
 // Before (error)
 [NormalizeConfiguration]
-public class AppNormalization : NormalizationConfig { ... }
+public class SearchNormalizer : NormalizationConfig { ... }
 
 // After (fixed)
 [NormalizeConfiguration]
-public partial class AppNormalization : NormalizationConfig { ... }
+public partial class SearchNormalizer : NormalizationConfig { ... }
 ```
 
 ## DN0003 — Type has no public properties

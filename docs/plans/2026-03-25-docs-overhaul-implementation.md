@@ -647,7 +647,7 @@ Changes:
 The "Working with the result" section becomes:
 
 ```csharp
-var result = AppNormalization.Normalize(team);
+var result = SearchNormalizer.Normalize(team);
 
 result.Result                            // The root DTO
 result.Result.Name                       // "Engineering"

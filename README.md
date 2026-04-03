@@ -105,7 +105,7 @@ using DataNormalizer.Attributes;
 using DataNormalizer.Configuration;
 
 [NormalizeConfiguration]
-public partial class AppNormalization : NormalizationConfig
+public partial class SearchNormalizer : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
@@ -117,7 +117,7 @@ public partial class AppNormalization : NormalizationConfig
 ### 3. Normalize and denormalize
 
 ```csharp
-var result = AppNormalization.Normalize(searchResponse);
+var result = SearchNormalizer.Normalize(searchResponse);
 
 // Access the root directly
 Console.WriteLine(result.Result.RoutesIndices.Length); // 2
@@ -131,7 +131,7 @@ Console.WriteLine(result.PlaceDtos.Length);    // 3 (deduplicated)
 var json = JsonSerializer.Serialize(result);
 
 // Denormalize back to the original object graph
-var restored = AppNormalization.Denormalize(result);
+var restored = SearchNormalizer.Denormalize(result);
 ```
 
 ## When To Use It

@@ -953,7 +953,7 @@ How I’d extend the config class
 
 Today, you probably have something conceptually like this:
 
-public sealed partial class AppNormalization : NormalizationConfig
+public sealed partial class SearchNormalizer : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
@@ -967,7 +967,7 @@ public sealed partial class AppNormalization : NormalizationConfig
 
 I would evolve it to something like this:
 
-public sealed partial class AppNormalization : NormalizationConfig
+public sealed partial class SearchNormalizer : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
@@ -1160,7 +1160,7 @@ My preferred final shape
 
 If I were adjusting the existing config class, I’d make it feel like this:
 
-public sealed partial class AppNormalization : NormalizationConfig
+public sealed partial class SearchNormalizer : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {

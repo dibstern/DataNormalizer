@@ -53,7 +53,7 @@ Everything is generated at compile time via a Roslyn `IIncrementalGenerator`. No
 
 ```csharp
 [NormalizeConfiguration]
-public partial class AppNormalization : NormalizationConfig
+public partial class SearchNormalizer : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
@@ -68,7 +68,7 @@ Generator walks `Person`'s type graph and generates normalized DTOs for every co
 
 ```csharp
 [NormalizeConfiguration]
-public partial class AppNormalization : NormalizationConfig
+public partial class SearchNormalizer : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
@@ -89,7 +89,7 @@ public partial class AppNormalization : NormalizationConfig
 
 ```csharp
 [NormalizeConfiguration]
-public partial class AppNormalization : NormalizationConfig
+public partial class SearchNormalizer : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
@@ -158,8 +158,8 @@ public partial class NormalizedPerson : IEquatable<NormalizedPerson>
 ### Generated Config Partial
 
 ```csharp
-// AppNormalization.g.cs
-public partial class AppNormalization
+// SearchNormalizer.g.cs
+public partial class SearchNormalizer
 {
     public static NormalizedResult<NormalizedPerson> Normalize(Person source)
     {
@@ -181,12 +181,12 @@ public partial class AppNormalization
 var person = new Person { ... };
 
 // Normalize
-var result = AppNormalization.Normalize(person);
+var result = SearchNormalizer.Normalize(person);
 var root = result.Root;
 var addresses = result.GetCollection<NormalizedAddress>();
 
 // Denormalize
-Person reconstructed = AppNormalization.Denormalize(result);
+Person reconstructed = SearchNormalizer.Denormalize(result);
 ```
 
 ### Partial Class Extensibility

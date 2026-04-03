@@ -43,7 +43,7 @@ using DataNormalizer.Attributes;
 using DataNormalizer.Configuration;
 
 [NormalizeConfiguration]
-public partial class AppNormalization : NormalizationConfig
+public partial class SearchNormalizer : NormalizationConfig
 {
     protected override void Configure(NormalizeBuilder builder)
     {
@@ -70,10 +70,10 @@ var team = new Team
 };
 
 // Normalize: nested graph → flat, deduplicated DTOs
-var result = AppNormalization.Normalize(team);
+var result = SearchNormalizer.Normalize(team);
 
 // Denormalize: flat DTOs → restored nested graph
-var restored = AppNormalization.Denormalize(result);
+var restored = SearchNormalizer.Denormalize(result);
 ```
 
 The `Normalize` and `Denormalize` static methods are generated at compile time by the source generator.
@@ -93,7 +93,7 @@ The source generator analyzes your `Configure` method at compile time and produc
 The `Normalize` method returns a container DTO (`TeamResultDto`) with a `Result` property for the root entity and typed arrays for every other entity type:
 
 ```csharp
-var result = AppNormalization.Normalize(team);
+var result = SearchNormalizer.Normalize(team);
 
 result.Result                            // TeamDto — the root entity (always present)
 
