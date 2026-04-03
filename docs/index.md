@@ -1,6 +1,3 @@
----
----
-
 # DataNormalizer
 
 A .NET source generator that normalizes nested object graphs into flat, deduplicated, JSON-serializable containers.
